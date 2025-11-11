@@ -29,7 +29,7 @@
     <img src="Draft Of IA UI Mockup.png" alt="Logo" width="80" height="80">
   </a>
 
-<h3 align="center">project_title</h3>
+<h3 align="center">House System Web App</h3>
 
   <p align="center">
     project_description
