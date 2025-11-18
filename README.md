@@ -82,7 +82,7 @@ Here's a blank template to get started. To avoid retyping too much info, do a se
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-TEST - DELETE THIS LINE
+TEST IF COMMITS WORK
 ### About the Client (IA A01 Client Scenario)
 
 Put some basic info about your client and their needs. You don't need to dox them, but provide the context for your project
