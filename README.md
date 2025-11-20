@@ -52,9 +52,9 @@
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">About The Project</a>
+      <a href="#about-the-project">A new more efficient way for executive and stuco representatives to quickly add house points with the a qucik acces of the current house score alongside a search method to find students houses and add points. With the goal of having a add students to houses, see a history of house points added, and if ambitions a calender creator and with the ability to add perameters. These are the goals and we will get as close as we can. </a>
       <ul>
-        <li><a href="#client-info">About the Client</a></li>
+        <li><a href="#client-info">The client is currently not solid but will probably be Ms.V or more likley a memeber of the executive board.</a></li>
         <li><a href="#built-with">Built With </a></li>
       </ul>
     </li>
@@ -82,7 +82,7 @@ Here's a blank template to get started. To avoid retyping too much info, do a se
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-TEST IF COMMITS WORK
+
 ### About the Client (IA A01 Client Scenario)
 
 Put some basic info about your client and their needs. You don't need to dox them, but provide the context for your project
