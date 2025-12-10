@@ -32,7 +32,7 @@
 <h3 align="center">House System Web App</h3>
 
   <p align="center">
-    project_description
+    A new more efficient way for executive and stuco representatives to quickly add house points with the a qucik acces of the current house score alongside a search method to find students houses and add points. With the goal of having a add students to houses, see a history of house points added, and if ambitions a calender creator and with the ability to add perameters. These are the goals and we will get as close as we can
     <br />
     <a href="https://github.com/github_username/repo_name"><strong>Explore the docs »</strong></a>
     <br />
@@ -52,7 +52,7 @@ Commit test
   <summary>Table of Contents</summary>
   <ol>
     <li>
-      <a href="#about-the-project">A new more efficient way for executive and stuco representatives to quickly add house points with the a qucik acces of the current house score alongside a search method to find students houses and add points. With the goal of having a add students to houses, see a history of house points added, and if ambitions a calender creator and with the ability to add perameters. These are the goals and we will get as close as we can. </a>
+      <a href="#about-the-project"> </a>
       <ul>
         <li><a href="#client-info">The client is currently not solid but will probably be Ms.V or more likley a memeber of the executive board.</a></li>
         <li><a href="#built-with">Built With </a></li>
