@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Leaderboard - House Points System{% endblock %}
+
+{% block content %}
+    <h2>📊 Complete Leaderboard</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>House</th>
+                <th>Color</th>
+                <th>Total Points</th>
+                <th>Events</th>
+                <th>Wins (1st)</th>
+                <th>2nd Place</th>
+                <th>3rd Place</th>
+                <th>4th Place</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rank, house_name, color, points, events, wins, second, third, fourth in leaderboard %}
+            <tr>
+                <td><strong style="font-size: 1.2em;">{{ rank }}</strong></td>
+                <td><strong>{{ house_name }}</strong></td>
+                <td><span class="house-badge house-{{ color }}">{{ color }}</span></td>
+                <td><strong style="font-size: 1.1em;">{{ points }}</strong></td>
+                <td>{{ events }}</td>
+                <td>{{ wins }}</td>
+                <td>{{ second }}</td>
+                <td>{{ third }}</td>
+                <td>{{ fourth }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3 style="margin-top: 40px;">Students by House Standing</h3>
+    <p style="color: #666; margin-bottom: 20px;">All students grouped by their house's current standing</p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Standing</th>
+                <th>House</th>
+                <th>Points</th>
+                <th>Grade</th>
+                <th>Student Name</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for standing, house_name, color, points, class_name, student_name, email in students_by_standing %}
+            <tr>
+                <td>{{ standing }}</td>
+                <td><span class="house-badge house-{{ color }}">{{ house_name }}</span></td>
+                <td>{{ points }}</td>
+                <td>{{ class_name }}</td>
+                <td><strong>{{ student_name }}</strong></td>
+                <td>{{ email }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

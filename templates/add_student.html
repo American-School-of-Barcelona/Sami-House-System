@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Add Student - House Points System{% endblock %}
+
+{% block content %}
+    <h2>Add New Student</h2>
+
+    <form method="POST" action="{{ url_for('add_student') }}">
+        <div class="form-group">
+            <label for="fname">First Name:</label>
+            <input type="text" id="fname" name="fname" required>
+        </div>
+
+        <div class="form-group">
+            <label for="lname">Last Name:</label>
+            <input type="text" id="lname" name="lname" required>
+        </div>
+
+        <div class="form-group">
+            <label for="email">Email:</label>
+            <input type="email" id="email" name="email" required>
+        </div>
+
+        <div class="form-group">
+            <label for="house_id">House:</label>
+            <select id="house_id" name="house_id" required>
+                <option value="">-- Select a House --</option>
+                {% for house_id, house_name, color in houses %}
+                <option value="{{ house_id }}">{{ house_name }} ({{ color }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="class_year_id">Class Year:</label>
+            <select id="class_year_id" name="class_year_id" required>
+                <option value="">-- Select a Class Year --</option>
+                {% for class_year_id, class_name, grad_year in class_years %}
+                <option value="{{ class_year_id }}">{{ class_name }} (Class of {{ grad_year }})</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <button type="submit">Add Student</button>
+        <a href="{{ url_for('students') }}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

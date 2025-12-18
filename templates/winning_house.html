@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Winning House - House Points System{% endblock %}
+
+{% block content %}
+    <h2>🏆 Winning House Details</h2>
+
+    {% if winner %}
+    <div class="winner-card">
+        <h2>{{ winner[0] }}</h2>
+        <div class="points">{{ winner[2] }} Points</div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <h3>Events Participated</h3>
+                <div class="number">{{ winner[3] }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>First Place Wins</h3>
+                <div class="number">{{ winner[4] }}</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Students</h3>
+                <div class="number">{{ winning_students|length }}</div>
+            </div>
+        </div>
+    </div>
+
+    <h3>Students by Grade Level</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Grade</th>
+                <th>Graduation Year</th>
+                <th>Student Count</th>
+                <th>Students</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for class_name, grad_year, count, students in students_by_grade %}
+            <tr>
+                <td><strong>{{ class_name }}</strong></td>
+                <td>{{ grad_year }}</td>
+                <td>{{ count }}</td>
+                <td>{{ students }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>All Students in Winning House</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Student Name</th>
+                <th>Email</th>
+                <th>Grade</th>
+                <th>Graduation Year</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student_name, email, house_name, color, class_name, grad_year, points in winning_students %}
+            <tr>
+                <td><strong>{{ student_name }}</strong></td>
+                <td>{{ email }}</td>
+                <td>{{ class_name }}</td>
+                <td>{{ grad_year }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% else %}
+    <p>No winner data available.</p>
+    {% endif %}
+
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+    </div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Students - House Points System{% endblock %}
+
+{% block content %}
+    <h2>All Students</h2>
+
+    <div style="margin-bottom: 20px;">
+        <a href="{{ url_for('add_student') }}" class="btn">➕ Add New Student</a>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Student Name</th>
+                <th>Email</th>
+                <th>House</th>
+                <th>Grade</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student_id, student_name, email, house_name, color, class_name in students %}
+            <tr>
+                <td>{{ student_id }}</td>
+                <td><strong>{{ student_name }}</strong></td>
+                <td>{{ email }}</td>
+                <td><span class="house-badge house-{{ color }}">{{ house_name }}</span></td>
+                <td>{{ class_name }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p style="margin-top: 20px; color: #666;">
+        Total Students: {{ students|length }}
+    </p>
+{% endblock %}

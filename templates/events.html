@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Events - House Points System{% endblock %}
+
+{% block content %}
+    <h2>All Events</h2>
+
+    <div style="margin-bottom: 20px;">
+        <a href="{{ url_for('add_event') }}" class="btn">➕ Add New Event</a>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Date</th>
+                <th>Event Description</th>
+                <th>Type</th>
+                <th>Houses Participated</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for event_id, event_date, event_desc, event_type, houses_participated in events %}
+            <tr>
+                <td>{{ event_id }}</td>
+                <td>{{ event_date }}</td>
+                <td><strong>{{ event_desc }}</strong></td>
+                <td>{{ event_type }}</td>
+                <td>{{ houses_participated }}</td>
+                <td>
+                    <a href="{{ url_for('event_details', event_id=event_id) }}" class="btn" style="padding: 5px 10px; font-size: 14px;">View Details</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p style="margin-top: 20px; color: #666;">
+        Total Events: {{ events|length }}
+    </p>
+{% endblock %}

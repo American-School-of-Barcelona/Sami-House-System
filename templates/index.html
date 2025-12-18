@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Home - House Points System{% endblock %}
+
+{% block content %}
+    <h2>Welcome to the House Points System</h2>
+
+    {% if winner %}
+    <div class="winner-card">
+        <h2>🎉 Current Winner</h2>
+        <h3>{{ winner[0] }}</h3>
+        <div class="points">{{ winner[2] }} Points</div>
+        <p>Events Participated: {{ winner[3] }} | First Place Wins: {{ winner[4] }}</p>
+    </div>
+    {% endif %}
+
+    <h3>Current Standings</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>House</th>
+                <th>Color</th>
+                <th>Total Points</th>
+                <th>Points Ahead</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rank, house_name, color, total_points, points_ahead in standings %}
+            <tr>
+                <td>{{ rank }}</td>
+                <td><strong>{{ house_name }}</strong></td>
+                <td><span class="house-badge house-{{ color }}">{{ color }}</span></td>
+                <td>{{ total_points }}</td>
+                <td>
+                    {% if points_ahead %}
+                        +{{ points_ahead }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h3>Detailed Leaderboard</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>House</th>
+                <th>Points</th>
+                <th>Events</th>
+                <th>1st</th>
+                <th>2nd</th>
+                <th>3rd</th>
+                <th>4th</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rank, house_name, color, points, events, wins, second, third, fourth in leaderboard %}
+            <tr>
+                <td><strong>{{ rank }}</strong></td>
+                <td>{{ house_name }}</td>
+                <td><strong>{{ points }}</strong></td>
+                <td>{{ events }}</td>
+                <td>{{ wins }}</td>
+                <td>{{ second }}</td>
+                <td>{{ third }}</td>
+                <td>{{ fourth }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 30px; text-align: center;">
+        <a href="{{ url_for('winning_house') }}" class="btn">View Winning House Details</a>
+        <a href="{{ url_for('add_event') }}" class="btn">Add New Event</a>
+    </div>
+{% endblock %}

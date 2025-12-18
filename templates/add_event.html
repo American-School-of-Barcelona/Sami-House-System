@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Add Event - House Points System{% endblock %}
+
+{% block content %}
+    <h2>Add New Event</h2>
+
+    <form method="POST" action="{{ url_for('add_event') }}">
+        <h3>Event Information</h3>
+
+        <div class="form-group">
+            <label for="event_date">Event Date:</label>
+            <input type="date" id="event_date" name="event_date" required>
+        </div>
+
+        <div class="form-group">
+            <label for="event_desc">Event Description:</label>
+            <input type="text" id="event_desc" name="event_desc" required placeholder="e.g., House Quiz Night">
+        </div>
+
+        <div class="form-group">
+            <label for="event_type">Event Type:</label>
+            <select id="event_type" name="event_type" required>
+                <option value="">-- Select Event Type --</option>
+                <option value="sports">Sports</option>
+                <option value="academic">Academic</option>
+                <option value="arts">Arts</option>
+                <option value="other">Other</option>
+            </select>
+        </div>
+
+        <h3>Event Results</h3>
+        <p>Enter the points and rank for each house. Leave blank if a house didn't participate.</p>
+
+        {% for house_id, house_name, color in houses %}
+        <div style="background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 8px;">
+            <h4>{{ house_name }} <span class="house-badge house-{{ color }}">{{ color }}</span></h4>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group">
+                    <label for="points_{{ house_id }}">Points Earned:</label>
+                    <input type="number" id="points_{{ house_id }}" name="points_{{ house_id }}"
+                           min="0" placeholder="e.g., 400">
+                </div>
+
+                <div class="form-group">
+                    <label for="rank_{{ house_id }}">Rank (1-4):</label>
+                    <input type="number" id="rank_{{ house_id }}" name="rank_{{ house_id }}"
+                           min="1" max="4" placeholder="1">
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <div style="margin-top: 20px;">
+            <button type="submit">Add Event</button>
+            <a href="{{ url_for('events') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+
+    <div style="background: #fff3cd; padding: 15px; margin-top: 20px; border-radius: 8px; border-left: 4px solid #ffc107;">
+        <strong>💡 Tip:</strong> Common point distributions:
+        <ul style="margin-top: 10px;">
+            <li>1st place: 400 points</li>
+            <li>2nd place: 300 points</li>
+            <li>3rd place: 200 points</li>
+            <li>4th place: 100 points</li>
+        </ul>
+    </div>
+{% endblock %}

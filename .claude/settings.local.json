@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python app.py:*)",
+      "Bash(cmd /c \"where python python3 py\")"
+    ]
+  }
+}

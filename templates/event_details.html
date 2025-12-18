@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Event Details - House Points System{% endblock %}
+
+{% block content %}
+    {% if event %}
+    <h2>Event Details</h2>
+
+    <div class="stat-card" style="text-align: left; margin-bottom: 30px;">
+        <h3 style="color: #333; font-size: 1.5em; margin-bottom: 10px;">{{ event[2] }}</h3>
+        <p><strong>Date:</strong> {{ event[1] }}</p>
+        <p><strong>Type:</strong> {{ event[3] }}</p>
+        <p><strong>Event ID:</strong> {{ event[0] }}</p>
+    </div>
+
+    <h3>Results</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Rank</th>
+                <th>House</th>
+                <th>Points Earned</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for house_name, color, rank, points_earned in results %}
+            <tr>
+                <td><strong>{{ rank }}</strong></td>
+                <td><span class="house-badge house-{{ color }}">{{ house_name }}</span></td>
+                <td>{{ points_earned }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('events') }}" class="btn btn-secondary">Back to Events</a>
+    </div>
+
+    {% else %}
+    <p>Event not found.</p>
+    <a href="{{ url_for('events') }}" class="btn btn-secondary">Back to Events</a>
+    {% endif %}
+{% endblock %}
