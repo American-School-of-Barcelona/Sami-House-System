@@ -274,6 +274,12 @@ def add_event():
         event_name = request.form.get('event_name')
         event_type = request.form.get('event_type')
 
+        # If "other" is selected, use custom event type
+        if event_type == 'other':
+            custom_event_type = request.form.get('custom_event_type')
+            if custom_event_type:
+                event_type = custom_event_type.strip()
+
         # Get results for each house
         results = []
         houses = get_all_houses()
