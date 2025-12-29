@@ -51,24 +51,6 @@
         stroke: currentColor;
     }
 
-    /* Confetti decorations */
-    .confetti {
-        position: absolute;
-        width: 15px;
-        height: 15px;
-        border-radius: 2px;
-    }
-
-    .confetti:nth-child(1) { background: #f4c430; top: -20px; left: -15px; transform: rotate(15deg); }
-    .confetti:nth-child(2) { background: #d64968; top: -25px; left: 10px; transform: rotate(-20deg); }
-    .confetti:nth-child(3) { background: #6ba873; top: -15px; right: -10px; transform: rotate(30deg); }
-    .confetti:nth-child(4) { background: #4a9ec9; top: 10px; left: -25px; transform: rotate(-10deg); }
-    .confetti:nth-child(5) { background: #f4c430; top: 30px; left: -20px; transform: rotate(25deg); }
-    .confetti:nth-child(6) { background: #d64968; bottom: 20px; left: -15px; transform: rotate(-15deg); }
-    .confetti:nth-child(7) { background: #6ba873; bottom: -10px; left: 15px; transform: rotate(20deg); }
-    .confetti:nth-child(8) { background: #4a9ec9; bottom: -15px; right: 10px; transform: rotate(-25deg); }
-    .confetti:nth-child(9) { background: #f4c430; top: 20px; right: -20px; transform: rotate(35deg); }
-    .confetti:nth-child(10) { background: #d64968; bottom: 30px; right: -15px; transform: rotate(-30deg); }
 
     .winner-text {
         font-size: 3em;
@@ -157,17 +139,6 @@
         {% if winner %}
         <div class="winner-display">
             <div class="winner-icon" style="color: {% if winner[0] == 'Poseidon' %}#4a9ec9{% elif winner[0] == 'Apollo' %}#d64968{% elif winner[0] == 'Artemis' %}#6ba873{% else %}#f4c430{% endif %}; border-color: {% if winner[0] == 'Poseidon' %}#4a9ec9{% elif winner[0] == 'Apollo' %}#d64968{% elif winner[0] == 'Artemis' %}#6ba873{% else %}#f4c430{% endif %};">
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-                <div class="confetti"></div>
-
                 {% if winner[0] == 'Poseidon' %}
                 <!-- Poseidon Trident -->
                 <svg viewBox="0 0 501.4 501.4" xmlns="http://www.w3.org/2000/svg">
