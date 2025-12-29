@@ -76,30 +76,54 @@ def index():
 
 @app.route('/students')
 def students():
-    """View all students"""
-    # Get all students with their house info
+    """View all students with search functionality"""
+    search_query = request.args.get('search', '').strip()
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
-    query = """
-    SELECT
-        s.student_id,
-        s.fname || ' ' || s.lname AS student_name,
-        s.email,
-        h.house_name,
-        h.color,
-        cy.class_name
-    FROM STUDENTS s
-    JOIN HOUSES h ON s.house_id = h.house_id
-    JOIN CLASS_YEARS cy ON s.class_year_id = cy.class_year_id
-    ORDER BY h.house_name, cy.display_order, s.lname, s.fname
-    """
+    if search_query:
+        # Search by name or email
+        query = """
+        SELECT
+            s.student_id,
+            s.fname || ' ' || s.lname AS student_name,
+            s.email,
+            h.house_name,
+            h.color,
+            cy.class_name
+        FROM STUDENTS s
+        JOIN HOUSES h ON s.house_id = h.house_id
+        JOIN CLASS_YEARS cy ON s.class_year_id = cy.class_year_id
+        WHERE s.fname || ' ' || s.lname LIKE ?
+           OR s.email LIKE ?
+           OR s.fname LIKE ?
+           OR s.lname LIKE ?
+        ORDER BY h.house_name, cy.display_order, s.lname, s.fname
+        """
+        search_pattern = f"%{search_query}%"
+        cursor.execute(query, (search_pattern, search_pattern, search_pattern, search_pattern))
+    else:
+        # Get all students
+        query = """
+        SELECT
+            s.student_id,
+            s.fname || ' ' || s.lname AS student_name,
+            s.email,
+            h.house_name,
+            h.color,
+            cy.class_name
+        FROM STUDENTS s
+        JOIN HOUSES h ON s.house_id = h.house_id
+        JOIN CLASS_YEARS cy ON s.class_year_id = cy.class_year_id
+        ORDER BY h.house_name, cy.display_order, s.lname, s.fname
+        """
+        cursor.execute(query)
 
-    cursor.execute(query)
     all_students = cursor.fetchall()
     conn.close()
 
-    return render_template('students.html', students=all_students)
+    return render_template('students.html', students=all_students, search_query=search_query)
 
 
 @app.route('/add-student', methods=['GET', 'POST'])

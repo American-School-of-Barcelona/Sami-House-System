@@ -1,38 +1,87 @@
 {% extends "base.html" %}
 
-{% block title %}Students - House Points System{% endblock %}
+{% block title %}Search Students - House Points System{% endblock %}
 
 {% block content %}
-    <h2>All Students</h2>
+    <h2>Search Student's House</h2>
 
-    <div style="margin-bottom: 20px;">
-        <a href="{{ url_for('add_student') }}" class="btn">➕ Add New Student</a>
+    <form method="GET" action="{{ url_for('students') }}" style="max-width: 600px;">
+        <div class="form-group">
+            <label for="search">Search by Name or Email:</label>
+            <input type="text" id="search" name="search" placeholder="Enter student name or email..." value="{{ search_query }}" autofocus>
+        </div>
+        <button type="submit">🔍 Search</button>
+        {% if search_query %}
+        <a href="{{ url_for('students') }}" class="btn btn-secondary">Clear Search</a>
+        {% endif %}
+    </form>
+
+    {% if search_query %}
+        <h3 style="margin-top: 40px;">Search Results for "{{ search_query }}"</h3>
+
+        {% if students %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Email</th>
+                    <th>House</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student_id, student_name, email, house_name, color, class_name in students %}
+                <tr>
+                    <td><strong>{{ student_name }}</strong></td>
+                    <td>{{ email }}</td>
+                    <td><span class="house-badge house-{{ color }}">{{ house_name }}</span></td>
+                    <td>{{ class_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p style="margin-top: 20px; color: #e8e8d0;">
+            Found {{ students|length }} student(s)
+        </p>
+        {% else %}
+        <div style="background: #3a3a3a; padding: 30px; border-radius: 15px; margin-top: 20px; text-align: center;">
+            <p style="font-size: 1.2em; color: #e8e8d0;">No students found matching "{{ search_query }}"</p>
+            <p style="margin-top: 10px; color: #999;">Try searching by a different name or email</p>
+        </div>
+        {% endif %}
+
+    {% else %}
+        <h3 style="margin-top: 40px;">All Students</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    <th>Email</th>
+                    <th>House</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for student_id, student_name, email, house_name, color, class_name in students %}
+                <tr>
+                    <td><strong>{{ student_name }}</strong></td>
+                    <td>{{ email }}</td>
+                    <td><span class="house-badge house-{{ color }}">{{ house_name }}</span></td>
+                    <td>{{ class_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p style="margin-top: 20px; color: #e8e8d0;">
+            Total Students: {{ students|length }}
+        </p>
+    {% endif %}
+
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('add_student') }}" class="btn">Add New Student</a>
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
     </div>
-
-    <table>
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Student Name</th>
-                <th>Email</th>
-                <th>House</th>
-                <th>Grade</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for student_id, student_name, email, house_name, color, class_name in students %}
-            <tr>
-                <td>{{ student_id }}</td>
-                <td><strong>{{ student_name }}</strong></td>
-                <td>{{ email }}</td>
-                <td><span class="house-badge house-{{ color }}">{{ house_name }}</span></td>
-                <td>{{ class_name }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <p style="margin-top: 20px; color: #666;">
-        Total Students: {{ students|length }}
-    </p>
 {% endblock %}
