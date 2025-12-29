@@ -14,8 +14,8 @@
         </div>
 
         <div class="form-group">
-            <label for="event_desc">Event Description:</label>
-            <input type="text" id="event_desc" name="event_desc" required placeholder="e.g., House Quiz Night">
+            <label for="event_name">Event Name:</label>
+            <input type="text" id="event_name" name="event_name" required placeholder="e.g., House Quiz Night">
         </div>
 
         <div class="form-group">
@@ -34,17 +34,17 @@
 
         {% for house_id, house_name, color in houses %}
         <div style="background: #f9f9f9; padding: 15px; margin: 10px 0; border-radius: 8px;">
-            <h4>{{ house_name }} <span class="house-badge house-{{ color }}">{{ color }}</span></h4>
+            <h4 style="color: #2b2b2b;"><span class="house-badge house-{{ color }}">{{ house_name }}</span></h4>
 
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div class="form-group">
-                    <label for="points_{{ house_id }}">Points Earned:</label>
+                    <label for="points_{{ house_id }}" style="color: #555;">Points Earned:</label>
                     <input type="number" id="points_{{ house_id }}" name="points_{{ house_id }}"
                            min="0" placeholder="e.g., 400">
                 </div>
 
                 <div class="form-group">
-                    <label for="rank_{{ house_id }}">Rank (1-4):</label>
+                    <label for="rank_{{ house_id }}" style="color: #555;">Rank (1-4):</label>
                     <input type="number" id="rank_{{ house_id }}" name="rank_{{ house_id }}"
                            min="1" max="4" placeholder="1">
                 </div>

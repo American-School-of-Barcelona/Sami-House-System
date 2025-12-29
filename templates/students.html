@@ -27,6 +27,7 @@
                     <th>Email</th>
                     <th>House</th>
                     <th>Grade</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -36,6 +37,9 @@
                     <td>{{ email }}</td>
                     <td><span class="house-badge house-{{ color }}">{{ house_name }}</span></td>
                     <td>{{ class_name }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_student', student_id=student_id) }}" class="btn" style="padding: 5px 10px; font-size: 14px;">Edit</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -61,6 +65,7 @@
                     <th>Email</th>
                     <th>House</th>
                     <th>Grade</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -70,6 +75,9 @@
                     <td>{{ email }}</td>
                     <td><span class="house-badge house-{{ color }}">{{ house_name }}</span></td>
                     <td>{{ class_name }}</td>
+                    <td>
+                        <a href="{{ url_for('edit_student', student_id=student_id) }}" class="btn" style="padding: 5px 10px; font-size: 14px;">Edit</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

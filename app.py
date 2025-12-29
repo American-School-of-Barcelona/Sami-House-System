@@ -128,26 +128,47 @@ def students():
 
 @app.route('/add-student', methods=['GET', 'POST'])
 def add_student():
-    """Add a new student"""
+    """Add new students"""
     if request.method == 'POST':
-        # Get form data
-        fname = request.form.get('fname')
-        lname = request.form.get('lname')
-        email = request.form.get('email')
-        house_id = request.form.get('house_id')
-        class_year_id = request.form.get('class_year_id')
+        # Get the number of students
+        student_count = int(request.form.get('student_count', 1))
 
-        # Validate
-        if not all([fname, lname, email, house_id, class_year_id]):
-            flash('All fields are required!', 'error')
-        else:
+        added_students = []
+        errors = []
+
+        # Process each student
+        for i in range(student_count):
+            fname = request.form.get(f'fname_{i}')
+            lname = request.form.get(f'lname_{i}')
+            email = request.form.get(f'email_{i}')
+            house_id = request.form.get(f'house_id_{i}')
+            class_year_id = request.form.get(f'class_year_id_{i}')
+
+            # Validate
+            if not all([fname, lname, email, house_id, class_year_id]):
+                errors.append(f'Student {i + 1}: All fields are required')
+                continue
+
             try:
                 # Add student to database
                 student_id = db.add_student(fname, lname, email, int(house_id), int(class_year_id))
-                flash(f'Successfully added {fname} {lname}!', 'success')
-                return redirect(url_for('students'))
+                added_students.append(f'{fname} {lname}')
             except Exception as e:
-                flash(f'Error adding student: {str(e)}', 'error')
+                errors.append(f'Student {i + 1} ({fname} {lname}): {str(e)}')
+
+        # Show results
+        if added_students:
+            if len(added_students) == 1:
+                flash(f'Successfully added {added_students[0]}!', 'success')
+            else:
+                flash(f'Successfully added {len(added_students)} students!', 'success')
+
+        if errors:
+            for error in errors:
+                flash(error, 'error')
+
+        if added_students:
+            return redirect(url_for('students'))
 
     # Get houses and class years for the form
     houses = get_all_houses()
@@ -216,13 +237,41 @@ def event_details(event_id):
     return render_template('event_details.html', event=event, results=results)
 
 
+@app.route('/event/<int:event_id>/delete', methods=['POST'])
+def delete_event(event_id):
+    """Delete an event and all its results"""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        # Get event name for the flash message
+        cursor.execute("SELECT event_desc FROM EVENTS WHERE event_id = ?", (event_id,))
+        event = cursor.fetchone()
+        event_name = event[0] if event else "Event"
+
+        # Delete event results first (due to foreign key constraint)
+        cursor.execute("DELETE FROM EVENT_RESULTS WHERE event_id = ?", (event_id,))
+
+        # Delete the event
+        cursor.execute("DELETE FROM EVENTS WHERE event_id = ?", (event_id,))
+
+        conn.commit()
+        conn.close()
+
+        flash(f'Successfully deleted event: {event_name}', 'success')
+    except Exception as e:
+        flash(f'Error deleting event: {str(e)}', 'error')
+
+    return redirect(url_for('events'))
+
+
 @app.route('/add-event', methods=['GET', 'POST'])
 def add_event():
     """Add a new event with results"""
     if request.method == 'POST':
         # Get event data
         event_date = request.form.get('event_date')
-        event_desc = request.form.get('event_desc')
+        event_name = request.form.get('event_name')
         event_type = request.form.get('event_type')
 
         # Get results for each house
@@ -237,17 +286,17 @@ def add_event():
                 results.append((int(house_id), int(points), int(rank)))
 
         # Validate
-        if not all([event_date, event_desc, event_type]):
-            flash('Event date, description, and type are required!', 'error')
+        if not all([event_date, event_name, event_type]):
+            flash('Event date, name, and type are required!', 'error')
         elif len(results) == 0:
             flash('Please enter results for at least one house!', 'error')
         else:
             try:
                 # Add event and results to database
                 event_id = db.add_complete_event_with_results(
-                    event_date, event_desc, event_type, results
+                    event_date, event_name, event_type, results
                 )
-                flash(f'Successfully added event: {event_desc}!', 'success')
+                flash(f'Successfully added event: {event_name}!', 'success')
                 return redirect(url_for('events'))
             except Exception as e:
                 flash(f'Error adding event: {str(e)}', 'error')
@@ -256,6 +305,64 @@ def add_event():
     houses = get_all_houses()
 
     return render_template('add_event.html', houses=houses)
+
+
+@app.route('/edit-student/<int:student_id>', methods=['GET', 'POST'])
+def edit_student(student_id):
+    """Edit an existing student"""
+    if request.method == 'POST':
+        # Get updated data
+        fname = request.form.get('fname')
+        lname = request.form.get('lname')
+        email = request.form.get('email')
+        house_id = request.form.get('house_id')
+        class_year_id = request.form.get('class_year_id')
+
+        # Validate
+        if not all([fname, lname, email, house_id, class_year_id]):
+            flash('All fields are required!', 'error')
+        else:
+            try:
+                # Update student in database
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+
+                cursor.execute("""
+                    UPDATE STUDENTS
+                    SET fname = ?, lname = ?, email = ?, house_id = ?, class_year_id = ?
+                    WHERE student_id = ?
+                """, (fname, lname, email, int(house_id), int(class_year_id), student_id))
+
+                conn.commit()
+                conn.close()
+
+                flash(f'Successfully updated {fname} {lname}!', 'success')
+                return redirect(url_for('students'))
+            except Exception as e:
+                flash(f'Error updating student: {str(e)}', 'error')
+
+    # GET request - show form with current data
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT student_id, fname, lname, email, house_id, class_year_id
+        FROM STUDENTS
+        WHERE student_id = ?
+    """, (student_id,))
+
+    student = cursor.fetchone()
+    conn.close()
+
+    if not student:
+        flash('Student not found!', 'error')
+        return redirect(url_for('students'))
+
+    # Get houses and class years for the form
+    houses = get_all_houses()
+    class_years = get_all_class_years()
+
+    return render_template('edit_student.html', student=student, houses=houses, class_years=class_years)
 
 
 @app.route('/leaderboard')

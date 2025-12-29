@@ -13,20 +13,36 @@
 
     .left-section {
         flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
     }
 
     .title {
         font-family: 'Product Sans', sans-serif;
-        font-size: 6em;
+        font-size: 8em;
         font-weight: bold;
         line-height: 1.1;
         margin-bottom: 40px;
+        margin-left: 40px;
     }
 
     .winner-display {
         display: flex;
+        flex-direction: column;
         align-items: center;
-        gap: 30px;
+        gap: 15px;
+    }
+
+    .winner-icon-row {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .winner-house-name {
+        font-size: 2.5em;
+        font-weight: bold;
     }
 
     .winner-icon {
@@ -71,7 +87,7 @@
         display: flex;
         align-items: flex-end;
         gap: 40px;
-        height: 500px;
+        height: 700px;
         padding: 20px;
     }
 
@@ -104,6 +120,31 @@
         border-radius: 15px 15px 0 0;
         position: relative;
         transition: height 0.5s ease;
+        cursor: pointer;
+    }
+
+    .bar::before {
+        content: attr(data-points) " points";
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%) translateY(-10px);
+        background-color: #1f1f1f;
+        color: #e8e8d0;
+        padding: 8px 12px;
+        border-radius: 8px;
+        font-size: 0.9em;
+        font-weight: bold;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease, transform 0.2s ease;
+        z-index: 10;
+    }
+
+    .bar:hover::before {
+        opacity: 1;
+        transform: translateX(-50%) translateY(-5px);
     }
 
     .rank-label {
@@ -131,7 +172,123 @@
     .house-athena .house-icon { border-color: #f4c430; color: #f4c430; }
     .house-athena .house-icon svg { fill: #f4c430; stroke: #f4c430; }
     .house-athena .bar { background-color: #f4c430; }
+
+    /* Confetti Animation */
+    .confetti-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        overflow: hidden;
+        z-index: 50;
+    }
+
+    .confetti {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        opacity: 0;
+        animation: confetti-fall 3s linear forwards;
+    }
+
+    @keyframes confetti-fall {
+        0% {
+            opacity: 1;
+            transform: translateY(-100vh) rotate(0deg);
+        }
+        100% {
+            opacity: 0;
+            transform: translateY(100vh) rotate(720deg);
+        }
+    }
+
+    .confetti:nth-child(1) { left: 10%; animation-delay: 0s; background: #4a9ec9; }
+    .confetti:nth-child(2) { left: 20%; animation-delay: 0.15s; background: #d64968; }
+    .confetti:nth-child(3) { left: 30%; animation-delay: 0.3s; background: #6ba873; }
+    .confetti:nth-child(4) { left: 40%; animation-delay: 0.45s; background: #f4c430; }
+    .confetti:nth-child(5) { left: 50%; animation-delay: 0.6s; background: #4a9ec9; }
+    .confetti:nth-child(6) { left: 60%; animation-delay: 0.75s; background: #d64968; }
+    .confetti:nth-child(7) { left: 70%; animation-delay: 0.9s; background: #6ba873; }
+    .confetti:nth-child(8) { left: 80%; animation-delay: 1.05s; background: #f4c430; }
+    .confetti:nth-child(9) { left: 90%; animation-delay: 1.2s; background: #4a9ec9; }
+    .confetti:nth-child(10) { left: 15%; animation-delay: 1.35s; background: #d64968; }
+    .confetti:nth-child(11) { left: 25%; animation-delay: 1.5s; background: #6ba873; }
+    .confetti:nth-child(12) { left: 35%; animation-delay: 1.65s; background: #f4c430; }
+    .confetti:nth-child(13) { left: 45%; animation-delay: 1.8s; background: #4a9ec9; }
+    .confetti:nth-child(14) { left: 55%; animation-delay: 1.95s; background: #d64968; }
+    .confetti:nth-child(15) { left: 65%; animation-delay: 2.1s; background: #6ba873; }
+    .confetti:nth-child(16) { left: 75%; animation-delay: 2.25s; background: #f4c430; }
+    .confetti:nth-child(17) { left: 85%; animation-delay: 2.4s; background: #4a9ec9; }
+    .confetti:nth-child(18) { left: 95%; animation-delay: 2.55s; background: #d64968; }
+    .confetti:nth-child(19) { left: 5%; animation-delay: 2.7s; background: #6ba873; }
+    .confetti:nth-child(20) { left: 12%; animation-delay: 2.85s; background: #f4c430; }
+    .confetti:nth-child(21) { left: 8%; animation-delay: 0.1s; background: #4a9ec9; }
+    .confetti:nth-child(22) { left: 18%; animation-delay: 0.25s; background: #d64968; }
+    .confetti:nth-child(23) { left: 28%; animation-delay: 0.4s; background: #6ba873; }
+    .confetti:nth-child(24) { left: 38%; animation-delay: 0.55s; background: #f4c430; }
+    .confetti:nth-child(25) { left: 48%; animation-delay: 0.7s; background: #4a9ec9; }
+    .confetti:nth-child(26) { left: 58%; animation-delay: 0.85s; background: #d64968; }
+    .confetti:nth-child(27) { left: 68%; animation-delay: 1s; background: #6ba873; }
+    .confetti:nth-child(28) { left: 78%; animation-delay: 1.15s; background: #f4c430; }
+    .confetti:nth-child(29) { left: 88%; animation-delay: 1.3s; background: #4a9ec9; }
+    .confetti:nth-child(30) { left: 98%; animation-delay: 1.45s; background: #d64968; }
+    .confetti:nth-child(31) { left: 3%; animation-delay: 1.6s; background: #6ba873; }
+    .confetti:nth-child(32) { left: 13%; animation-delay: 1.75s; background: #f4c430; }
+    .confetti:nth-child(33) { left: 23%; animation-delay: 1.9s; background: #4a9ec9; }
+    .confetti:nth-child(34) { left: 33%; animation-delay: 2.05s; background: #d64968; }
+    .confetti:nth-child(35) { left: 43%; animation-delay: 2.2s; background: #6ba873; }
+    .confetti:nth-child(36) { left: 53%; animation-delay: 2.35s; background: #f4c430; }
+    .confetti:nth-child(37) { left: 63%; animation-delay: 2.5s; background: #4a9ec9; }
+    .confetti:nth-child(38) { left: 73%; animation-delay: 2.65s; background: #d64968; }
+    .confetti:nth-child(39) { left: 83%; animation-delay: 2.8s; background: #6ba873; }
+    .confetti:nth-child(40) { left: 93%; animation-delay: 2.95s; background: #f4c430; }
 </style>
+
+<!-- Confetti Animation -->
+<div class="confetti-container">
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+    <div class="confetti"></div>
+</div>
 
 <div class="dashboard">
     <div class="left-section">
@@ -139,8 +296,9 @@
 
         {% if winner %}
         <div class="winner-display">
-            <div class="winner-icon" style="color: {% if winner[0] == 'Poseidon' %}#4a9ec9{% elif winner[0] == 'Apollo' %}#d64968{% elif winner[0] == 'Artemis' %}#6ba873{% else %}#f4c430{% endif %}; border-color: {% if winner[0] == 'Poseidon' %}#4a9ec9{% elif winner[0] == 'Apollo' %}#d64968{% elif winner[0] == 'Artemis' %}#6ba873{% else %}#f4c430{% endif %};">
-                {% if winner[0] == 'Poseidon' %}
+            <div class="winner-icon-row">
+                <div class="winner-icon" style="color: {% if winner[0] == 'Poseidon' %}#4a9ec9{% elif winner[0] == 'Apollo' %}#d64968{% elif winner[0] == 'Artemis' %}#6ba873{% else %}#f4c430{% endif %}; border-color: {% if winner[0] == 'Poseidon' %}#4a9ec9{% elif winner[0] == 'Apollo' %}#d64968{% elif winner[0] == 'Artemis' %}#6ba873{% else %}#f4c430{% endif %};">
+                    {% if winner[0] == 'Poseidon' %}
                 <!-- Poseidon Trident -->
                 <svg viewBox="0 0 501.4 501.4" xmlns="http://www.w3.org/2000/svg">
                     <path fill="currentColor" d="M501.4,250.7c0,138.46-112.24,250.7-250.7,250.7S0,389.16,0,250.7,112.24,0,250.7,0s250.7,112.24,250.7,250.7ZM480.6,250.68c0-126.97-102.93-229.9-229.9-229.9S20.8,123.71,20.8,250.68s102.93,229.9,229.9,229.9,229.9-102.93,229.9-229.9Z"/>
@@ -169,7 +327,9 @@
                     <path fill="currentColor" d="M217.69,180.78c0,14.06-11.4,25.47-25.47,25.47s-25.47-11.4-25.47-25.47,11.4-25.47,25.47-25.47,25.47,11.4,25.47,25.47ZM200.23,180.73c0-4.41-3.57-7.98-7.98-7.98s-7.98,3.57-7.98,7.98,3.57,7.98,7.98,7.98,7.98-3.57,7.98-7.98Z"/>
                     <circle fill="white" cx="192.25" cy="180.73" r="7.98"/>
                 </svg>
-                {% endif %}
+                    {% endif %}
+                </div>
+                <div class="winner-house-name" style="color: {% if winner[0] == 'Poseidon' %}#4a9ec9{% elif winner[0] == 'Apollo' %}#d64968{% elif winner[0] == 'Artemis' %}#6ba873{% else %}#f4c430{% endif %};">{{ winner[0] }}</div>
             </div>
             <div class="winner-text">Is Winning!</div>
         </div>
@@ -178,6 +338,7 @@
 
     <div class="chart-section">
         <div class="chart-container">
+            {% set max_points = leaderboard[0][3] if leaderboard else 1 %}
             {% for rank, house_name, color, points, events, wins, second, third, fourth in leaderboard %}
             <div class="house-bar house-{{ house_name|lower }}">
                 <div class="house-icon">
@@ -209,7 +370,7 @@
                     {% endif %}
                 </div>
 
-                <div class="bar" style="height: {{ (points / 10) }}px;"></div>
+                <div class="bar" style="height: {{ (points / max_points * 500) | int }}px;" data-points="{{ points }}"></div>
 
                 <div class="rank-label">
                     {% if rank == 1 %}1st

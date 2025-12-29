@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Student - House Points System{% endblock %}
+
+{% block content %}
+    <h2>Edit Student</h2>
+
+    <form method="POST" action="{{ url_for('edit_student', student_id=student[0]) }}">
+        <div class="student-entry" style="background: #3a3a3a; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+            <h3 style="color: #e8e8d0; margin-bottom: 15px;">Student Information</h3>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label for="fname">First Name:</label>
+                    <input type="text" id="fname" name="fname" value="{{ student[1] }}" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="lname">Last Name:</label>
+                    <input type="text" id="lname" name="lname" value="{{ student[2] }}" required>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="{{ student[3] }}" required>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div class="form-group">
+                    <label for="house_id">House:</label>
+                    <select id="house_id" name="house_id" required>
+                        {% for house_id, house_name, color in houses %}
+                        <option value="{{ house_id }}" {% if house_id == student[4] %}selected{% endif %}>{{ house_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="class_year_id">Class Year:</label>
+                    <select id="class_year_id" name="class_year_id" required>
+                        {% for class_year_id, class_name, grad_year in class_years %}
+                        <option value="{{ class_year_id }}" {% if class_year_id == student[5] %}selected{% endif %}>{{ class_name }} ({{ grad_year }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="submit">Save Changes</button>
+            <a href="{{ url_for('students') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+{% endblock %}

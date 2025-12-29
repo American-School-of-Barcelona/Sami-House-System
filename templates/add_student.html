@@ -1,47 +1,136 @@
 {% extends "base.html" %}
 
-{% block title %}Add Student - House Points System{% endblock %}
+{% block title %}Add Students - House Points System{% endblock %}
 
 {% block content %}
-    <h2>Add New Student</h2>
+    <h2>Add New Students</h2>
 
     <form method="POST" action="{{ url_for('add_student') }}">
-        <div class="form-group">
-            <label for="fname">First Name:</label>
-            <input type="text" id="fname" name="fname" required>
+        <div id="students-container">
+            <!-- Student 1 -->
+            <div class="student-entry" style="background: #3a3a3a; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <h3 style="color: #e8e8d0; margin-bottom: 15px;">Student 1</h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label for="fname_0">First Name:</label>
+                        <input type="text" id="fname_0" name="fname_0" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="lname_0">Last Name:</label>
+                        <input type="text" id="lname_0" name="lname_0" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email_0">Email:</label>
+                    <input type="email" id="email_0" name="email_0" required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label for="house_id_0">House:</label>
+                        <select id="house_id_0" name="house_id_0" required>
+                            <option value="">-- Select a House --</option>
+                            {% for house_id, house_name, color in houses %}
+                            <option value="{{ house_id }}">{{ house_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="class_year_id_0">Class Year:</label>
+                        <select id="class_year_id_0" name="class_year_id_0" required>
+                            <option value="">-- Select a Class Year --</option>
+                            {% for class_year_id, class_name, grad_year in class_years %}
+                            <option value="{{ class_year_id }}">{{ class_name }} ({{ grad_year }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <div class="form-group">
-            <label for="lname">Last Name:</label>
-            <input type="text" id="lname" name="lname" required>
-        </div>
+        <input type="hidden" id="student-count" name="student_count" value="1">
 
-        <div class="form-group">
-            <label for="email">Email:</label>
-            <input type="email" id="email" name="email" required>
+        <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" onclick="addStudent()" style="background: #6ba873;">+ Add Another Student</button>
+            <button type="submit">Save All Students</button>
+            <a href="{{ url_for('students') }}" class="btn btn-secondary">Cancel</a>
         </div>
-
-        <div class="form-group">
-            <label for="house_id">House:</label>
-            <select id="house_id" name="house_id" required>
-                <option value="">-- Select a House --</option>
-                {% for house_id, house_name, color in houses %}
-                <option value="{{ house_id }}">{{ house_name }} ({{ color }})</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label for="class_year_id">Class Year:</label>
-            <select id="class_year_id" name="class_year_id" required>
-                <option value="">-- Select a Class Year --</option>
-                {% for class_year_id, class_name, grad_year in class_years %}
-                <option value="{{ class_year_id }}">{{ class_name }} (Class of {{ grad_year }})</option>
-                {% endfor %}
-            </select>
-        </div>
-
-        <button type="submit">Add Student</button>
-        <a href="{{ url_for('students') }}" class="btn btn-secondary">Cancel</a>
     </form>
+
+    <script>
+        let studentCount = 1;
+
+        function addStudent() {
+            studentCount++;
+            const container = document.getElementById('students-container');
+
+            const studentDiv = document.createElement('div');
+            studentDiv.className = 'student-entry';
+            studentDiv.style.cssText = 'background: #3a3a3a; padding: 20px; border-radius: 10px; margin-bottom: 20px;';
+
+            studentDiv.innerHTML = `
+                <h3 style="color: #e8e8d0; margin-bottom: 15px;">Student ${studentCount}</h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label for="fname_${studentCount - 1}">First Name:</label>
+                        <input type="text" id="fname_${studentCount - 1}" name="fname_${studentCount - 1}" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="lname_${studentCount - 1}">Last Name:</label>
+                        <input type="text" id="lname_${studentCount - 1}" name="lname_${studentCount - 1}" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="email_${studentCount - 1}">Email:</label>
+                    <input type="email" id="email_${studentCount - 1}" name="email_${studentCount - 1}" required>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label for="house_id_${studentCount - 1}">House:</label>
+                        <select id="house_id_${studentCount - 1}" name="house_id_${studentCount - 1}" required>
+                            <option value="">-- Select a House --</option>
+                            {% for house_id, house_name, color in houses %}
+                            <option value="{{ house_id }}">{{ house_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="class_year_id_${studentCount - 1}">Class Year:</label>
+                        <select id="class_year_id_${studentCount - 1}" name="class_year_id_${studentCount - 1}" required>
+                            <option value="">-- Select a Class Year --</option>
+                            {% for class_year_id, class_name, grad_year in class_years %}
+                            <option value="{{ class_year_id }}">{{ class_name }} ({{ grad_year }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <button type="button" onclick="removeStudent(this)" style="background: #d64968; margin-top: 10px;">Remove Student</button>
+            `;
+
+            container.appendChild(studentDiv);
+            document.getElementById('student-count').value = studentCount;
+        }
+
+        function removeStudent(button) {
+            button.parentElement.remove();
+            studentCount--;
+            document.getElementById('student-count').value = studentCount;
+
+            // Renumber remaining students
+            const entries = document.querySelectorAll('.student-entry h3');
+            entries.forEach((h3, index) => {
+                h3.textContent = `Student ${index + 1}`;
+            });
+        }
+    </script>
 {% endblock %}
