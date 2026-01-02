@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Quick Points - House Points System{% endblock %}
+
+{% block content %}
+    <h2>Quick Points Input</h2>
+    <p style="margin-bottom: 20px; color: #e8e8d0;">Quickly add points to houses without creating an event.</p>
+
+    <form method="POST" action="{{ url_for('quick_points') }}">
+        <h3 style="color: #e8e8d0; margin-bottom: 15px;">Award Points to Houses</h3>
+
+        {% for house_id, house_name, color in houses %}
+        <div style="background: #3a3a3a; padding: 20px; border-radius: 10px; margin-bottom: 15px;">
+            <h4 style="color: #2b2b2b;"><span class="house-badge house-{{ color }}">{{ house_name }}</span></h4>
+
+            <div class="form-group">
+                <label for="points_{{ house_id }}" style="color: #555;">Points to Add:</label>
+                <input type="number" id="points_{{ house_id }}" name="points_{{ house_id }}"
+                       placeholder="Enter points (e.g., 100)" min="0" step="1">
+            </div>
+
+            <div class="form-group">
+                <label for="reason_{{ house_id }}" style="color: #555;">Reason (Optional):</label>
+                <input type="text" id="reason_{{ house_id }}" name="reason_{{ house_id }}"
+                       placeholder="e.g., Hallway cleanup, Good behavior">
+            </div>
+        </div>
+        {% endfor %}
+
+        <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="submit">Award Points</button>
+            <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+
+    <div style="background: #fff3cd; padding: 15px; margin-top: 20px; border-radius: 8px; border-left: 4px solid #ffc107; color: #555;">
+        <strong>💡 Tip:</strong> Only enter points for houses you want to award. Leave others blank to skip them.
+    </div>
+{% endblock %}

@@ -313,6 +313,68 @@ def add_event():
     return render_template('add_event.html', houses=houses)
 
 
+@app.route('/quick-points', methods=['GET', 'POST'])
+def quick_points():
+    """Quick points input without creating an event"""
+    if request.method == 'POST':
+        # Get houses
+        houses = get_all_houses()
+        points_awarded = []
+
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+
+        try:
+            for house_id, house_name, color in houses:
+                points = request.form.get(f'points_{house_id}')
+                reason = request.form.get(f'reason_{house_id}', '').strip()
+
+                # Only process if points were entered
+                if points and points.strip():
+                    points_value = int(points)
+                    if points_value > 0:
+                        # Create a simple event entry for tracking
+                        from datetime import date
+                        event_date = date.today().strftime('%Y-%m-%d')
+                        event_type = 'quick_points'
+                        event_name = reason if reason else 'Quick Points'
+
+                        # Insert event
+                        cursor.execute("""
+                            INSERT INTO EVENTS (event_date, event_desc, event_type)
+                            VALUES (?, ?, ?)
+                        """, (event_date, event_name, event_type))
+
+                        event_id = cursor.lastrowid
+
+                        # Insert event result
+                        cursor.execute("""
+                            INSERT INTO EVENT_RESULTS (event_id, house_id, points_earned, rank)
+                            VALUES (?, ?, ?, 1)
+                        """, (event_id, house_id, points_value))
+
+                        points_awarded.append(f"{house_name}: +{points_value} points")
+
+            conn.commit()
+
+            if points_awarded:
+                flash(f"Successfully awarded points! {', '.join(points_awarded)}", 'success')
+            else:
+                flash('No points were awarded. Please enter points for at least one house.', 'error')
+
+        except Exception as e:
+            conn.rollback()
+            flash(f'Error awarding points: {str(e)}', 'error')
+        finally:
+            conn.close()
+
+        return redirect(url_for('index'))
+
+    # GET request - show form
+    houses = get_all_houses()
+    return render_template('quick_points.html', houses=houses)
+
+
 @app.route('/edit-student/<int:student_id>', methods=['GET', 'POST'])
 def edit_student(student_id):
     """Edit an existing student"""

@@ -256,7 +256,14 @@
                 </svg>
             </a>
 
-            <a href="{{ url_for('events') }}" class="sidebar-btn" title="Events Calendar">
+            <a href="{{ url_for('events') }}" class="sidebar-btn" title="Events History">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M12 6v6l4 2"></path>
+                </svg>
+            </a>
+
+            <a href="{{ url_for('add_event') }}" class="sidebar-btn" title="Add Event">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                     <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -265,7 +272,7 @@
                 </svg>
             </a>
 
-            <a href="{{ url_for('add_event') }}" class="sidebar-btn" title="Add Event">
+            <a href="{{ url_for('quick_points') }}" class="sidebar-btn" title="Quick Points">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
