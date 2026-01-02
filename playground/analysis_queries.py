@@ -60,10 +60,16 @@ class HousePointsAnalyzer:
         SELECT
             h.house_name,
             h.color,
-            COALESCE(SUM(er.points_earned), 0) AS total_points,
+            COALESCE(SUM(
+                CASE
+                    WHEN e.event_type = 'deduction' THEN -er.points_earned
+                    ELSE er.points_earned
+                END
+            ), 0) AS total_points,
             COUNT(er.event_id) AS events_participated
         FROM HOUSES h
         LEFT JOIN EVENT_RESULTS er ON h.house_id = er.house_id
+        LEFT JOIN EVENTS e ON er.event_id = e.event_id
         GROUP BY h.house_id, h.house_name, h.color
         ORDER BY total_points DESC
         """
@@ -278,10 +284,20 @@ class HousePointsAnalyzer:
         """
         query = """
         SELECT
-            ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(er.points_earned), 0) DESC) AS current_rank,
+            ROW_NUMBER() OVER (ORDER BY COALESCE(SUM(
+                CASE
+                    WHEN e.event_type = 'deduction' THEN -er.points_earned
+                    ELSE er.points_earned
+                END
+            ), 0) DESC) AS current_rank,
             h.house_name,
             h.color,
-            COALESCE(SUM(er.points_earned), 0) AS total_points,
+            COALESCE(SUM(
+                CASE
+                    WHEN e.event_type = 'deduction' THEN -er.points_earned
+                    ELSE er.points_earned
+                END
+            ), 0) AS total_points,
             COUNT(DISTINCT er.event_id) AS events_participated,
             SUM(CASE WHEN er.rank = 1 THEN 1 ELSE 0 END) AS wins,
             SUM(CASE WHEN er.rank = 2 THEN 1 ELSE 0 END) AS second_place,
@@ -289,6 +305,7 @@ class HousePointsAnalyzer:
             SUM(CASE WHEN er.rank = 4 THEN 1 ELSE 0 END) AS fourth_place
         FROM HOUSES h
         LEFT JOIN EVENT_RESULTS er ON h.house_id = er.house_id
+        LEFT JOIN EVENTS e ON er.event_id = e.event_id
         GROUP BY h.house_id, h.house_name, h.color
         ORDER BY total_points DESC
         """
@@ -308,11 +325,17 @@ class HousePointsAnalyzer:
         SELECT
             h.house_name AS winning_house,
             h.color,
-            COALESCE(SUM(er.points_earned), 0) AS total_points,
+            COALESCE(SUM(
+                CASE
+                    WHEN e.event_type = 'deduction' THEN -er.points_earned
+                    ELSE er.points_earned
+                END
+            ), 0) AS total_points,
             COUNT(DISTINCT er.event_id) AS events_participated,
             SUM(CASE WHEN er.rank = 1 THEN 1 ELSE 0 END) AS first_place_wins
         FROM HOUSES h
         LEFT JOIN EVENT_RESULTS er ON h.house_id = er.house_id
+        LEFT JOIN EVENTS e ON er.event_id = e.event_id
         GROUP BY h.house_id, h.house_name, h.color
         ORDER BY total_points DESC
         LIMIT 1

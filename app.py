@@ -332,12 +332,21 @@ def quick_points():
                 # Only process if points were entered
                 if points and points.strip():
                     points_value = int(points)
-                    if points_value > 0:
-                        # Create a simple event entry for tracking
+                    if points_value != 0:  # Allow both positive and negative values
+                        # Create event entry for tracking
                         from datetime import date
                         event_date = date.today().strftime('%Y-%m-%d')
-                        event_type = 'quick_points'
-                        event_name = reason if reason else 'Quick Points'
+
+                        # For deductions, store as positive but with special event type
+                        # The analysis queries will need to handle 'deduction' type by subtracting
+                        if points_value < 0:
+                            event_type = 'deduction'
+                            event_name = reason if reason else 'Point Deduction'
+                            stored_points = abs(points_value)  # Store absolute value
+                        else:
+                            event_type = 'quick_points'
+                            event_name = reason if reason else 'Quick Points'
+                            stored_points = points_value
 
                         # Insert event
                         cursor.execute("""
@@ -347,20 +356,22 @@ def quick_points():
 
                         event_id = cursor.lastrowid
 
-                        # Insert event result
+                        # Insert event result with absolute value (to satisfy constraint)
                         cursor.execute("""
                             INSERT INTO EVENT_RESULTS (event_id, house_id, points_earned, rank)
                             VALUES (?, ?, ?, 1)
-                        """, (event_id, house_id, points_value))
+                        """, (event_id, house_id, stored_points))
 
-                        points_awarded.append(f"{house_name}: +{points_value} points")
+                        # Format the message with + or - prefix
+                        sign = '+' if points_value > 0 else ''
+                        points_awarded.append(f"{house_name}: {sign}{points_value} points")
 
             conn.commit()
 
             if points_awarded:
-                flash(f"Successfully awarded points! {', '.join(points_awarded)}", 'success')
+                flash(f"Successfully applied points! {', '.join(points_awarded)}", 'success')
             else:
-                flash('No points were awarded. Please enter points for at least one house.', 'error')
+                flash('No points were applied. Please enter points for at least one house.', 'error')
 
         except Exception as e:
             conn.rollback()
