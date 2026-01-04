@@ -9,7 +9,6 @@ Then visit: http://localhost:5000
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
@@ -22,17 +21,6 @@ from analysis_queries import HousePointsAnalyzer
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here-change-in-production'
-
-# Flask-Mail Configuration
-app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Change to your SMTP server
-app.config['MAIL_PORT'] = 587
-app.config['MAIL_USE_TLS'] = True
-app.config['MAIL_USERNAME'] = 'noreply@yourschool.edu'  # Change to your email
-app.config['MAIL_PASSWORD'] = 'your-app-password-here'  # Change to your app password
-app.config['MAIL_DEFAULT_SENDER'] = ('House Points System', 'noreply@yourschool.edu')
-
-# Initialize Flask-Mail
-mail = Mail(app)
 
 # Database path
 DB_PATH = os.path.join('playground', 'testhouse.db')
@@ -119,41 +107,6 @@ def get_all_class_years():
     return class_years
 
 
-def send_welcome_email(email):
-    """Send welcome email to new user"""
-    try:
-        msg = Message(
-            subject='Welcome to House Points System',
-            recipients=[email]
-        )
-        msg.html = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-            <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
-                <h1 style="color: #2b2b2b; text-align: center;">Welcome to House Points System!</h1>
-                <p style="font-size: 16px; color: #555;">Hello,</p>
-                <p style="font-size: 16px; color: #555;">
-                    Your account has been successfully created. You can now log in to the House Points System using your email address:
-                </p>
-                <p style="font-size: 18px; font-weight: bold; color: #2b2b2b; text-align: center; background-color: #e8e8d0; padding: 15px; border-radius: 5px;">
-                    {email}
-                </p>
-                <p style="font-size: 16px; color: #555;">
-                    You can access the system at your school's House Points portal.
-                </p>
-                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
-                <p style="font-size: 14px; color: #999; text-align: center;">
-                    This is an automated message. Please do not reply to this email.
-                </p>
-            </div>
-        </body>
-        </html>
-        """
-        mail.send(msg)
-        return True
-    except Exception as e:
-        print(f"Error sending email: {e}")
-        return False
 
 
 # ============================================
@@ -238,12 +191,7 @@ def register():
                 conn.commit()
                 conn.close()
 
-                # Send welcome email
-                if send_welcome_email(email):
-                    flash('Account created successfully! A welcome email has been sent. You can now log in.', 'success')
-                else:
-                    flash('Account created successfully! You can now log in. (Note: Welcome email could not be sent)', 'success')
-
+                flash('Account created successfully! You can now log in.', 'success')
                 return redirect(url_for('login'))
 
     return render_template('register.html')
