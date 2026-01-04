@@ -9,6 +9,7 @@ Then visit: http://localhost:5000
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_mail import Mail, Message
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
@@ -21,6 +22,17 @@ from analysis_queries import HousePointsAnalyzer
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here-change-in-production'
+
+# Flask-Mail Configuration
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'  # Change to your SMTP server
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'noreply@yourschool.edu'  # Change to your email
+app.config['MAIL_PASSWORD'] = 'your-app-password-here'  # Change to your app password
+app.config['MAIL_DEFAULT_SENDER'] = ('House Points System', 'noreply@yourschool.edu')
+
+# Initialize Flask-Mail
+mail = Mail(app)
 
 # Database path
 DB_PATH = os.path.join('playground', 'testhouse.db')
@@ -42,10 +54,15 @@ login_manager.login_message = 'Please log in to access this page.'
 
 class User(UserMixin):
     """User class for Flask-Login"""
-    def __init__(self, user_id, username, role):
+    def __init__(self, user_id, email, role):
         self.id = user_id
-        self.username = username
+        self.email = email
         self.role = role
+
+    @property
+    def username(self):
+        """Backwards compatibility - return email as username"""
+        return self.email
 
 
 @login_manager.user_loader
@@ -57,7 +74,7 @@ def load_user(user_id):
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT user_id, username, role FROM USERS WHERE user_id = ?", (user_id,))
+    cursor.execute("SELECT user_id, email, role FROM USERS WHERE user_id = ?", (user_id,))
     user_data = cursor.fetchone()
     conn.close()
 
@@ -102,6 +119,43 @@ def get_all_class_years():
     return class_years
 
 
+def send_welcome_email(email):
+    """Send welcome email to new user"""
+    try:
+        msg = Message(
+            subject='Welcome to House Points System',
+            recipients=[email]
+        )
+        msg.html = f"""
+        <html>
+        <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+            <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 30px; border-radius: 10px;">
+                <h1 style="color: #2b2b2b; text-align: center;">Welcome to House Points System!</h1>
+                <p style="font-size: 16px; color: #555;">Hello,</p>
+                <p style="font-size: 16px; color: #555;">
+                    Your account has been successfully created. You can now log in to the House Points System using your email address:
+                </p>
+                <p style="font-size: 18px; font-weight: bold; color: #2b2b2b; text-align: center; background-color: #e8e8d0; padding: 15px; border-radius: 5px;">
+                    {email}
+                </p>
+                <p style="font-size: 16px; color: #555;">
+                    You can access the system at your school's House Points portal.
+                </p>
+                <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+                <p style="font-size: 14px; color: #999; text-align: center;">
+                    This is an automated message. Please do not reply to this email.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+        mail.send(msg)
+        return True
+    except Exception as e:
+        print(f"Error sending email: {e}")
+        return False
+
+
 # ============================================
 # AUTHENTICATION ROUTES
 # ============================================
@@ -113,13 +167,13 @@ def login():
         return redirect(url_for('index'))
 
     if request.method == 'POST':
-        username = request.form.get('username')
+        email = request.form.get('email')
         password = request.form.get('password')
 
         # Get user from database
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
-        cursor.execute("SELECT user_id, username, password_hash, role FROM USERS WHERE username = ?", (username,))
+        cursor.execute("SELECT user_id, email, password_hash, role FROM USERS WHERE email = ?", (email,))
         user_data = cursor.fetchone()
         conn.close()
 
@@ -127,10 +181,10 @@ def login():
         if user_data and check_password_hash(user_data[2], password):
             user = User(user_data[0], user_data[1], user_data[3])
             login_user(user)
-            flash(f'Welcome back, {username}!', 'success')
+            flash(f'Welcome back, {email}!', 'success')
             return redirect(url_for('index'))
         else:
-            flash('Invalid username or password', 'error')
+            flash('Invalid email or password', 'error')
 
     return render_template('login.html')
 
@@ -151,40 +205,45 @@ def register():
         return redirect(url_for('index'))
 
     if request.method == 'POST':
-        username = request.form.get('username')
+        email = request.form.get('email')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
 
         # Validate input
-        if not username or not password or not confirm_password:
+        if not email or not password or not confirm_password:
             flash('All fields are required', 'error')
-        elif len(username) < 3:
-            flash('Username must be at least 3 characters long', 'error')
+        elif '@' not in email or '.' not in email:
+            flash('Please enter a valid email address', 'error')
         elif len(password) < 6:
             flash('Password must be at least 6 characters long', 'error')
         elif password != confirm_password:
             flash('Passwords do not match', 'error')
         else:
-            # Check if username already exists
+            # Check if email already exists
             conn = sqlite3.connect(DB_PATH)
             cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM USERS WHERE username = ?", (username,))
+            cursor.execute("SELECT user_id FROM USERS WHERE email = ?", (email,))
             existing_user = cursor.fetchone()
 
             if existing_user:
-                flash('Username already taken. Please choose a different username.', 'error')
+                flash('An account with this email already exists.', 'error')
                 conn.close()
             else:
                 # Create new user
                 password_hash = generate_password_hash(password)
                 cursor.execute("""
-                    INSERT INTO USERS (username, password_hash, role)
+                    INSERT INTO USERS (email, password_hash, role)
                     VALUES (?, ?, 'admin')
-                """, (username, password_hash))
+                """, (email, password_hash))
                 conn.commit()
                 conn.close()
 
-                flash('Account created successfully! You can now log in.', 'success')
+                # Send welcome email
+                if send_welcome_email(email):
+                    flash('Account created successfully! A welcome email has been sent. You can now log in.', 'success')
+                else:
+                    flash('Account created successfully! You can now log in. (Note: Welcome email could not be sent)', 'success')
+
                 return redirect(url_for('login'))
 
     return render_template('register.html')
