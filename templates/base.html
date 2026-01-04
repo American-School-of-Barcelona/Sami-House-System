@@ -69,9 +69,22 @@
             color: #2b2b2b;
         }
 
-        /* Logout button - hidden */
+        /* Logout button */
         .logout-btn {
-            display: none;
+            position: fixed;
+            top: 20px;
+            right: 120px;
+            background: #555;
+            color: #ffffff;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+
+        .logout-btn:hover {
+            background: #666;
         }
 
         /* Content area */
@@ -213,7 +226,7 @@
     </style>
 </head>
 <body>
-    <div class="logout-btn">Logout: username</div>
+    <a href="{{ url_for('logout') }}" class="logout-btn">Logout ({{ current_user.username }})</a>
 
     <div class="main-container">
         <div class="content">

@@ -7,7 +7,9 @@ Run with:
 Then visit: http://localhost:5000
 """
 
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
 
@@ -26,6 +28,38 @@ DB_PATH = os.path.join('playground', 'testhouse.db')
 # Initialize database handlers
 db = HousePointsDatabase(DB_PATH)
 analyzer = HousePointsAnalyzer(DB_PATH)
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+login_manager.login_message = 'Please log in to access this page.'
+
+
+# ============================================
+# USER CLASS FOR FLASK-LOGIN
+# ============================================
+
+class User(UserMixin):
+    """User class for Flask-Login"""
+    def __init__(self, user_id, username, role):
+        self.id = user_id
+        self.username = username
+        self.role = role
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user from database"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, username, role FROM USERS WHERE user_id = ?", (user_id,))
+    user_data = cursor.fetchone()
+    conn.close()
+
+    if user_data:
+        return User(user_data[0], user_data[1], user_data[2])
+    return None
 
 
 # ============================================
@@ -53,10 +87,53 @@ def get_all_class_years():
 
 
 # ============================================
-# ROUTES
+# AUTHENTICATION ROUTES
+# ============================================
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login page"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+
+        # Get user from database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT user_id, username, password_hash, role FROM USERS WHERE username = ?", (username,))
+        user_data = cursor.fetchone()
+        conn.close()
+
+        # Check if user exists and password is correct
+        if user_data and check_password_hash(user_data[2], password):
+            user = User(user_data[0], user_data[1], user_data[3])
+            login_user(user)
+            flash(f'Welcome back, {username}!', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid username or password', 'error')
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+@login_required
+def logout():
+    """Logout current user"""
+    logout_user()
+    flash('You have been logged out successfully.', 'success')
+    return redirect(url_for('login'))
+
+
+# ============================================
+# MAIN ROUTES
 # ============================================
 
 @app.route('/')
+@login_required
 def index():
     """Home page - shows winning house and leaderboard"""
     # Get winning house
@@ -75,6 +152,7 @@ def index():
 
 
 @app.route('/students')
+@login_required
 def students():
     """View all students with search functionality"""
     search_query = request.args.get('search', '').strip()
@@ -127,6 +205,7 @@ def students():
 
 
 @app.route('/add-student', methods=['GET', 'POST'])
+@login_required
 def add_student():
     """Add new students"""
     if request.method == 'POST':
@@ -178,6 +257,7 @@ def add_student():
 
 
 @app.route('/events')
+@login_required
 def events():
     """View all events"""
     # Get all events with their results
@@ -205,6 +285,7 @@ def events():
 
 
 @app.route('/event/<int:event_id>')
+@login_required
 def event_details(event_id):
     """View details of a specific event"""
     conn = sqlite3.connect(DB_PATH)
@@ -238,6 +319,7 @@ def event_details(event_id):
 
 
 @app.route('/event/<int:event_id>/delete', methods=['POST'])
+@login_required
 def delete_event(event_id):
     """Delete an event and all its results"""
     try:
@@ -266,6 +348,7 @@ def delete_event(event_id):
 
 
 @app.route('/add-event', methods=['GET', 'POST'])
+@login_required
 def add_event():
     """Add a new event with results"""
     if request.method == 'POST':
@@ -314,6 +397,7 @@ def add_event():
 
 
 @app.route('/quick-points', methods=['GET', 'POST'])
+@login_required
 def quick_points():
     """Quick points input without creating an event"""
     if request.method == 'POST':
@@ -387,6 +471,7 @@ def quick_points():
 
 
 @app.route('/edit-student/<int:student_id>', methods=['GET', 'POST'])
+@login_required
 def edit_student(student_id):
     """Edit an existing student"""
     if request.method == 'POST':
@@ -445,6 +530,7 @@ def edit_student(student_id):
 
 
 @app.route('/leaderboard')
+@login_required
 def leaderboard():
     """Full leaderboard page"""
     # Get complete leaderboard
@@ -459,6 +545,7 @@ def leaderboard():
 
 
 @app.route('/winning-house')
+@login_required
 def winning_house():
     """Detailed winning house page"""
     # Get winning house
