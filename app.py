@@ -107,6 +107,19 @@ def get_all_class_years():
     return class_years
 
 
+def get_executive_title(email):
+    """Get the executive title for a given email"""
+    titles = {
+        'saakingbade@asbarcelona.com': 'Student Council President',
+        'daberaznik@asbarcelona.com': 'Student Council Vice President',
+        'ancarle@asbarcelona.com': 'Student Council Vice President',
+        'lgatto@asbarcelona.com': 'Student Council Secretary',
+        'rahorta@asbarcelona.com': 'Student Council Treasurer',
+        'adsosa@asbarcelona.com': 'Student Council Director of Public Relations'
+    }
+    return titles.get(email.lower(), email)
+
+
 
 
 # ============================================
@@ -134,7 +147,8 @@ def login():
         if user_data and check_password_hash(user_data[2], password):
             user = User(user_data[0], user_data[1], user_data[3])
             login_user(user)
-            flash(f'Welcome back, {email}!', 'success')
+            title = get_executive_title(email)
+            flash(f'Welcome back, {title}!', 'success')
             return redirect(url_for('index'))
         else:
             flash('Invalid email or password', 'error')
@@ -153,9 +167,19 @@ def guest_login():
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
-    """Register new user"""
+    """Register new user - restricted to executive members only"""
     if current_user.is_authenticated:
         return redirect(url_for('index'))
+
+    # List of authorized executive member emails
+    AUTHORIZED_EMAILS = [
+        'daberaznik@asbarcelona.com',
+        'ancarle@asbarcelona.com',
+        'lgatto@asbarcelona.com',
+        'adsosa@asbarcelona.com',
+        'rahorta@asbarcelona.com',
+        'saakingbade@asbarcelona.com'
+    ]
 
     if request.method == 'POST':
         email = request.form.get('email')
@@ -167,6 +191,8 @@ def register():
             flash('All fields are required', 'error')
         elif '@' not in email or '.' not in email:
             flash('Please enter a valid email address', 'error')
+        elif email.lower() not in [e.lower() for e in AUTHORIZED_EMAILS]:
+            flash('This email is not authorized to create an account. Only Student Council Executive members can register. Please use the Guest login instead.', 'error')
         elif len(password) < 6:
             flash('Password must be at least 6 characters long', 'error')
         elif password != confirm_password:
