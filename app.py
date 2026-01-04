@@ -51,6 +51,10 @@ class User(UserMixin):
 @login_manager.user_loader
 def load_user(user_id):
     """Load user from database"""
+    # Special case for guest user
+    if user_id == 'guest':
+        return User('guest', 'Guest', 'guest')
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute("SELECT user_id, username, role FROM USERS WHERE user_id = ?", (user_id,))
@@ -65,6 +69,18 @@ def load_user(user_id):
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
+
+def admin_required(f):
+    """Decorator to require admin role (blocks guest users)"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role == 'guest':
+            flash('You need administrator access to view this page.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 
 def get_all_houses():
     """Get all houses from database"""
@@ -117,6 +133,15 @@ def login():
             flash('Invalid username or password', 'error')
 
     return render_template('login.html')
+
+
+@app.route('/guest')
+def guest_login():
+    """Login as guest with limited access"""
+    guest_user = User('guest', 'Guest', 'guest')
+    login_user(guest_user)
+    flash('Logged in as Guest. You have limited access to view-only pages.', 'success')
+    return redirect(url_for('index'))
 
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -252,6 +277,7 @@ def students():
 
 @app.route('/add-student', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def add_student():
     """Add new students"""
     if request.method == 'POST':
@@ -366,6 +392,7 @@ def event_details(event_id):
 
 @app.route('/event/<int:event_id>/delete', methods=['POST'])
 @login_required
+@admin_required
 def delete_event(event_id):
     """Delete an event and all its results"""
     try:
@@ -395,6 +422,7 @@ def delete_event(event_id):
 
 @app.route('/add-event', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def add_event():
     """Add a new event with results"""
     if request.method == 'POST':
@@ -444,6 +472,7 @@ def add_event():
 
 @app.route('/quick-points', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def quick_points():
     """Quick points input without creating an event"""
     if request.method == 'POST':
@@ -518,6 +547,7 @@ def quick_points():
 
 @app.route('/edit-student/<int:student_id>', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def edit_student(student_id):
     """Edit an existing student"""
     if request.method == 'POST':
@@ -577,6 +607,7 @@ def edit_student(student_id):
 
 @app.route('/leaderboard')
 @login_required
+@admin_required
 def leaderboard():
     """Full leaderboard page"""
     # Get complete leaderboard
@@ -592,6 +623,7 @@ def leaderboard():
 
 @app.route('/winning-house')
 @login_required
+@admin_required
 def winning_house():
     """Detailed winning house page"""
     # Get winning house

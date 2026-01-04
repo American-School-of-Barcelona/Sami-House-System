@@ -260,6 +260,7 @@
                 </svg>
             </a>
 
+            {% if current_user.role != 'guest' %}
             <a href="{{ url_for('add_student') }}" class="sidebar-btn" title="Add Student">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="9" cy="7" r="4"></circle>
@@ -268,6 +269,7 @@
                     <line x1="22" y1="11" x2="16" y2="11"></line>
                 </svg>
             </a>
+            {% endif %}
 
             <a href="{{ url_for('events') }}" class="sidebar-btn" title="Events History">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -276,6 +278,7 @@
                 </svg>
             </a>
 
+            {% if current_user.role != 'guest' %}
             <a href="{{ url_for('add_event') }}" class="sidebar-btn" title="Add Event">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -291,6 +294,7 @@
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
             </a>
+            {% endif %}
         </div>
     </div>
 </body>
