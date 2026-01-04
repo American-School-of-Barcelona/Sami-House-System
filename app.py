@@ -108,16 +108,33 @@ def get_all_class_years():
 
 
 def get_executive_title(email):
-    """Get the executive title for a given email"""
-    titles = {
-        'saakingbade@asbarcelona.com': 'Student Council President',
-        'daberaznik@asbarcelona.com': 'Student Council Vice President',
-        'ancarle@asbarcelona.com': 'Student Council Vice President',
-        'lgatto@asbarcelona.com': 'Student Council Secretary',
-        'rahorta@asbarcelona.com': 'Student Council Treasurer',
-        'adsosa@asbarcelona.com': 'Student Council Director of Public Relations'
-    }
-    return titles.get(email.lower(), email)
+    """Get the executive title for a given email from database"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT title FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (email,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else email
+
+
+def get_authorized_emails():
+    """Get list of authorized executive emails from database"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT email FROM AUTHORIZED_EXECUTIVES")
+    emails = [row[0] for row in cursor.fetchall()]
+    conn.close()
+    return emails
+
+
+def get_all_authorized_executives():
+    """Get all authorized executives with their titles"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT email, title, added_at FROM AUTHORIZED_EXECUTIVES ORDER BY added_at")
+    executives = cursor.fetchall()
+    conn.close()
+    return executives
 
 
 
@@ -171,27 +188,20 @@ def register():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
 
-    # List of authorized executive member emails
-    AUTHORIZED_EMAILS = [
-        'daberaznik@asbarcelona.com',
-        'ancarle@asbarcelona.com',
-        'lgatto@asbarcelona.com',
-        'adsosa@asbarcelona.com',
-        'rahorta@asbarcelona.com',
-        'saakingbade@asbarcelona.com'
-    ]
-
     if request.method == 'POST':
         email = request.form.get('email')
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
+
+        # Get authorized emails from database
+        authorized_emails = get_authorized_emails()
 
         # Validate input
         if not email or not password or not confirm_password:
             flash('All fields are required', 'error')
         elif '@' not in email or '.' not in email:
             flash('Please enter a valid email address', 'error')
-        elif email.lower() not in [e.lower() for e in AUTHORIZED_EMAILS]:
+        elif email.lower() not in [e.lower() for e in authorized_emails]:
             flash('This email is not authorized to create an account. Only Student Council Executive members can register. Please use the Guest login instead.', 'error')
         elif len(password) < 6:
             flash('Password must be at least 6 characters long', 'error')
@@ -230,6 +240,76 @@ def logout():
     logout_user()
     flash('You have been logged out successfully.', 'success')
     return redirect(url_for('login'))
+
+
+@app.route('/manage_executives', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def manage_executives():
+    """Manage authorized executive emails and titles"""
+    if request.method == 'POST':
+        action = request.form.get('action')
+
+        if action == 'add':
+            new_email = request.form.get('new_email')
+            new_title = request.form.get('new_title')
+
+            if not new_email or not new_title:
+                flash('Email and title are required', 'error')
+            elif '@' not in new_email or '.' not in new_email:
+                flash('Please enter a valid email address', 'error')
+            else:
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("""
+                        INSERT INTO AUTHORIZED_EXECUTIVES (email, title)
+                        VALUES (?, ?)
+                    """, (new_email.lower(), new_title))
+                    conn.commit()
+                    flash(f'Successfully added {new_email} as {new_title}', 'success')
+                except sqlite3.IntegrityError:
+                    flash('This email is already authorized', 'error')
+                finally:
+                    conn.close()
+
+        elif action == 'remove':
+            remove_email = request.form.get('remove_email')
+            current_email = current_user.email
+
+            if remove_email.lower() == current_email.lower():
+                # User is removing their own access
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+
+                # Delete from authorized executives
+                cursor.execute("DELETE FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (remove_email,))
+
+                # Delete user account
+                cursor.execute("DELETE FROM USERS WHERE LOWER(email) = LOWER(?)", (remove_email,))
+
+                conn.commit()
+                conn.close()
+
+                # Log them out
+                logout_user()
+                flash('Your executive access has been removed. You have been logged out.', 'success')
+                return redirect(url_for('login'))
+            else:
+                # Removing someone else's access
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (remove_email,))
+                cursor.execute("DELETE FROM USERS WHERE LOWER(email) = LOWER(?)", (remove_email,))
+                conn.commit()
+                conn.close()
+                flash(f'Successfully removed {remove_email} from authorized executives', 'success')
+
+        return redirect(url_for('manage_executives'))
+
+    # GET request - display the management page
+    executives = get_all_authorized_executives()
+    return render_template('manage_executives.html', executives=executives)
 
 
 # ============================================

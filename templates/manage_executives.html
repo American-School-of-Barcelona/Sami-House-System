@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Executives - House Points System{% endblock %}
+
+{% block content %}
+    <h2>Manage Executive Access</h2>
+    <p style="margin-bottom: 20px; color: #e8e8d0;">Add or remove Student Council Executive members who can create accounts.</p>
+
+    <!-- Add New Executive -->
+    <div style="background: #3a3a3a; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
+        <h3 style="color: #e8e8d0; margin-bottom: 20px;">Add New Executive</h3>
+        <form method="POST" action="{{ url_for('manage_executives') }}">
+            <input type="hidden" name="action" value="add">
+
+            <div class="form-group">
+                <label for="new_email">Email:</label>
+                <input type="email" id="new_email" name="new_email" required placeholder="example@asbarcelona.com">
+            </div>
+
+            <div class="form-group">
+                <label for="new_title">Title:</label>
+                <select id="new_title" name="new_title" required>
+                    <option value="">Select a title...</option>
+                    <option value="Student Council President">Student Council President</option>
+                    <option value="Student Council Vice President">Student Council Vice President</option>
+                    <option value="Student Council Secretary">Student Council Secretary</option>
+                    <option value="Student Council Treasurer">Student Council Treasurer</option>
+                    <option value="Student Council Director of Public Relations">Student Council Director of Public Relations</option>
+                    <option value="Student Council Executive">Student Council Executive</option>
+                </select>
+            </div>
+
+            <button type="submit">Add Executive</button>
+        </form>
+    </div>
+
+    <!-- Current Executives -->
+    <h3 style="color: #e8e8d0; margin-bottom: 15px;">Current Authorized Executives</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Email</th>
+                <th>Title</th>
+                <th>Added Date</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for email, title, added_at in executives %}
+            <tr>
+                <td><strong>{{ email }}</strong></td>
+                <td>{{ title }}</td>
+                <td>{{ added_at[:10] if added_at else 'N/A' }}</td>
+                <td>
+                    <form method="POST" action="{{ url_for('manage_executives') }}" style="display: inline;" onsubmit="return confirm('{% if email.lower() == current_user.email.lower() %}WARNING: You are removing your own access. You will be logged out and will no longer be able to access the admin panel. Are you sure?{% else %}Are you sure you want to remove {{ email }} from authorized executives? Their account will also be deleted if it exists.{% endif %}');">
+                        <input type="hidden" name="action" value="remove">
+                        <input type="hidden" name="remove_email" value="{{ email }}">
+                        <button type="submit" class="btn" style="background: #d64968; padding: 5px 10px; font-size: 14px;">
+                            {% if email.lower() == current_user.email.lower() %}Remove My Access{% else %}Remove{% endif %}
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p style="margin-top: 20px; color: #e8e8d0;">
+        Total Executives: {{ executives|length }}
+    </p>
+
+    <div style="background: #fff3cd; padding: 15px; margin-top: 20px; border-radius: 8px; border-left: 4px solid #ffc107; color: #555;">
+        <strong>⚠️ Warning:</strong> Removing an executive will delete their authorization and their account (if they have registered). If you remove your own access, you will be immediately logged out and cannot access the admin panel again.
+    </div>
+
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+    </div>
+{% endblock %}
