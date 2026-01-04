@@ -119,6 +119,52 @@ def login():
     return render_template('login.html')
 
 
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Register new user"""
+    if current_user.is_authenticated:
+        return redirect(url_for('index'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        confirm_password = request.form.get('confirm_password')
+
+        # Validate input
+        if not username or not password or not confirm_password:
+            flash('All fields are required', 'error')
+        elif len(username) < 3:
+            flash('Username must be at least 3 characters long', 'error')
+        elif len(password) < 6:
+            flash('Password must be at least 6 characters long', 'error')
+        elif password != confirm_password:
+            flash('Passwords do not match', 'error')
+        else:
+            # Check if username already exists
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+            cursor.execute("SELECT user_id FROM USERS WHERE username = ?", (username,))
+            existing_user = cursor.fetchone()
+
+            if existing_user:
+                flash('Username already taken. Please choose a different username.', 'error')
+                conn.close()
+            else:
+                # Create new user
+                password_hash = generate_password_hash(password)
+                cursor.execute("""
+                    INSERT INTO USERS (username, password_hash, role)
+                    VALUES (?, ?, 'admin')
+                """, (username, password_hash))
+                conn.commit()
+                conn.close()
+
+                flash('Account created successfully! You can now log in.', 'success')
+                return redirect(url_for('login'))
+
+    return render_template('register.html')
+
+
 @app.route('/logout')
 @login_required
 def logout():
