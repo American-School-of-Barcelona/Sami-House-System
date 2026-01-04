@@ -201,6 +201,8 @@ def register():
             flash('All fields are required', 'error')
         elif '@' not in email or '.' not in email:
             flash('Please enter a valid email address', 'error')
+        elif not email.lower().endswith('@asbarcelona.com'):
+            flash('Only @asbarcelona.com email addresses are allowed', 'error')
         elif email.lower() not in [e.lower() for e in authorized_emails]:
             flash('This email is not authorized to create an account. Only Student Council Executive members can register. Please use the Guest login instead.', 'error')
         elif len(password) < 6:
@@ -258,6 +260,8 @@ def manage_executives():
                 flash('Email and title are required', 'error')
             elif '@' not in new_email or '.' not in new_email:
                 flash('Please enter a valid email address', 'error')
+            elif not new_email.lower().endswith('@asbarcelona.com'):
+                flash('Only @asbarcelona.com email addresses are allowed', 'error')
             else:
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
