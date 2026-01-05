@@ -338,7 +338,7 @@
 
     <div class="chart-section">
         <div class="chart-container">
-            {% set max_points = leaderboard[0][3] if leaderboard else 1 %}
+            {% set max_points = leaderboard[0][3] if (leaderboard and leaderboard[0][3] > 0) else 1 %}
             {% for rank, house_name, color, points, events, wins, second, third, fourth in leaderboard %}
             <div class="house-bar house-{{ house_name|lower }}">
                 <div class="house-icon">
