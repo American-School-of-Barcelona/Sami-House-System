@@ -316,6 +316,100 @@ def manage_executives():
     return render_template('manage_executives.html', executives=executives)
 
 
+@app.route('/year_end_reset', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def year_end_reset():
+    """Year-end reset: Remove seniors, promote students, reset all points"""
+    if request.method == 'POST':
+        confirm = request.form.get('confirm')
+
+        if confirm == 'RESET':
+            conn = sqlite3.connect(DB_PATH)
+            cursor = conn.cursor()
+
+            try:
+                # Get current year to identify seniors
+                cursor.execute("SELECT MIN(grad_year) FROM CLASS_YEARS")
+                senior_year = cursor.fetchone()[0]
+
+                # Count what will be affected
+                cursor.execute("SELECT COUNT(*) FROM STUDENTS WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)", (senior_year,))
+                seniors_count = cursor.fetchone()[0]
+
+                cursor.execute("SELECT COUNT(*) FROM EVENTS")
+                events_count = cursor.fetchone()[0]
+
+                # Step 1: Delete all seniors
+                cursor.execute("""
+                    DELETE FROM STUDENTS
+                    WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)
+                """, (senior_year,))
+
+                # Step 2: Delete all events and event results (resets all points)
+                cursor.execute("DELETE FROM EVENT_RESULTS")
+                cursor.execute("DELETE FROM EVENTS")
+
+                # Step 3: Promote all remaining students (decrease grad_year by 1)
+                cursor.execute("UPDATE CLASS_YEARS SET grad_year = grad_year - 1")
+
+                # Step 4: Update class names to reflect new year
+                cursor.execute("""
+                    UPDATE CLASS_YEARS
+                    SET class_name = CASE
+                        WHEN display_order = 1 THEN 'Senior'
+                        WHEN display_order = 2 THEN 'Junior'
+                        WHEN display_order = 3 THEN 'Sophomore'
+                        WHEN display_order = 4 THEN 'Freshman'
+                    END
+                """)
+
+                conn.commit()
+
+                flash(f'Year-end reset completed successfully! Removed {seniors_count} seniors, deleted {events_count} events, and promoted all remaining students.', 'success')
+                return redirect(url_for('index'))
+
+            except Exception as e:
+                conn.rollback()
+                flash(f'Error during year-end reset: {str(e)}', 'error')
+            finally:
+                conn.close()
+        else:
+            flash('Reset cancelled. You must type "RESET" to confirm.', 'error')
+
+    # GET request - show confirmation page with statistics
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Get statistics
+    cursor.execute("SELECT MIN(grad_year) FROM CLASS_YEARS")
+    senior_year = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM STUDENTS WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)", (senior_year,))
+    seniors_count = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM STUDENTS")
+    total_students = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM EVENTS")
+    events_count = cursor.fetchone()[0]
+
+    cursor.execute("SELECT SUM(points) FROM EVENT_RESULTS")
+    total_points = cursor.fetchone()[0] or 0
+
+    conn.close()
+
+    stats = {
+        'senior_year': senior_year,
+        'seniors_count': seniors_count,
+        'remaining_students': total_students - seniors_count,
+        'events_count': events_count,
+        'total_points': total_points
+    }
+
+    return render_template('year_end_reset.html', stats=stats)
+
+
 # ============================================
 # MAIN ROUTES
 # ============================================

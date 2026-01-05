@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Year-End Reset - House Points System{% endblock %}
+
+{% block content %}
+    <h2 style="color: #d64968; margin-bottom: 20px;">⚠️ Year-End Reset</h2>
+    <p style="margin-bottom: 30px; color: #e8e8d0; font-size: 1.1em;">This will prepare the system for a new school year.</p>
+
+    <div style="background: #fff3cd; padding: 20px; margin-bottom: 30px; border-radius: 10px; border-left: 5px solid #ffc107; color: #555;">
+        <h3 style="color: #856404; margin-bottom: 15px;">⚠️ WARNING: This action cannot be undone!</h3>
+        <p style="margin-bottom: 10px;"><strong>The following will happen when you confirm:</strong></p>
+        <ol style="margin-left: 20px; line-height: 1.8;">
+            <li><strong>Delete all {{ stats.seniors_count }} graduating seniors</strong> (Class of {{ stats.senior_year }})</li>
+            <li><strong>Delete all {{ stats.events_count }} events</strong> and reset all house points to zero</li>
+            <li><strong>Promote all {{ stats.remaining_students }} remaining students</strong>:
+                <ul style="margin-left: 20px; margin-top: 5px;">
+                    <li>Current Juniors → Seniors</li>
+                    <li>Current Sophomores → Juniors</li>
+                    <li>Current Freshmen → Sophomores</li>
+                </ul>
+            </li>
+            <li><strong>Update graduation years</strong> for all class levels</li>
+        </ol>
+    </div>
+
+    <div style="background: #3a3a3a; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
+        <h3 style="color: #e8e8d0; margin-bottom: 20px;">Current System Statistics</h3>
+        <table style="width: 100%; border-collapse: collapse;">
+            <tr style="border-bottom: 1px solid #555;">
+                <td style="padding: 15px; color: #e8e8d0;"><strong>Graduating Seniors (Class of {{ stats.senior_year }}):</strong></td>
+                <td style="padding: 15px; color: #fff; text-align: right; font-size: 1.2em;"><strong>{{ stats.seniors_count }}</strong></td>
+            </tr>
+            <tr style="border-bottom: 1px solid #555;">
+                <td style="padding: 15px; color: #e8e8d0;"><strong>Remaining Students (to be promoted):</strong></td>
+                <td style="padding: 15px; color: #fff; text-align: right; font-size: 1.2em;"><strong>{{ stats.remaining_students }}</strong></td>
+            </tr>
+            <tr style="border-bottom: 1px solid #555;">
+                <td style="padding: 15px; color: #e8e8d0;"><strong>Total Events (to be deleted):</strong></td>
+                <td style="padding: 15px; color: #fff; text-align: right; font-size: 1.2em;"><strong>{{ stats.events_count }}</strong></td>
+            </tr>
+            <tr>
+                <td style="padding: 15px; color: #e8e8d0;"><strong>Total Points (to be reset):</strong></td>
+                <td style="padding: 15px; color: #fff; text-align: right; font-size: 1.2em;"><strong>{{ stats.total_points }}</strong></td>
+            </tr>
+        </table>
+    </div>
+
+    <div style="background: #f8d7da; padding: 20px; margin-bottom: 30px; border-radius: 10px; border-left: 5px solid #d64968; color: #555;">
+        <h3 style="color: #721c24; margin-bottom: 15px;">⚠️ Important Notes:</h3>
+        <ul style="margin-left: 20px; line-height: 1.8;">
+            <li>This process is <strong>irreversible</strong> - all data will be permanently deleted</li>
+            <li>Make sure you have backed up any data you need before proceeding</li>
+            <li>Consider exporting event history or taking screenshots if needed</li>
+            <li>This should typically be done at the start of the new school year (around September 1st)</li>
+            <li>All executive members will retain their access</li>
+        </ul>
+    </div>
+
+    <form method="POST" action="{{ url_for('year_end_reset') }}" style="background: #3a3a3a; padding: 30px; border-radius: 15px;">
+        <h3 style="color: #e8e8d0; margin-bottom: 20px;">Confirm Year-End Reset</h3>
+        <p style="margin-bottom: 20px; color: #fff;">To confirm this action, please type <strong style="color: #d64968;">RESET</strong> in the box below:</p>
+
+        <div class="form-group">
+            <label for="confirm">Type "RESET" to confirm:</label>
+            <input type="text" id="confirm" name="confirm" required placeholder="RESET" style="background: #2b2b2b; border: 2px solid #d64968; color: #fff; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px;">
+        </div>
+
+        <div style="display: flex; gap: 15px; margin-top: 30px;">
+            <button type="submit" style="flex: 1; background: #d64968; color: #fff; padding: 15px; font-size: 1.1em; font-weight: bold; border: none; border-radius: 10px; cursor: pointer;">
+                🗑️ Execute Year-End Reset
+            </button>
+            <a href="{{ url_for('index') }}" style="flex: 1; background: #555; color: #fff; padding: 15px; font-size: 1.1em; font-weight: bold; border: none; border-radius: 10px; text-align: center; text-decoration: none; display: flex; align-items: center; justify-content: center;">
+                Cancel
+            </a>
+        </div>
+    </form>
+
+    <div style="margin-top: 30px; text-align: center; color: #999;">
+        <p>Questions? Contact the Student Council President before proceeding.</p>
+    </div>
+{% endblock %}
