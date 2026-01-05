@@ -81,12 +81,24 @@ def load_user(user_id):
 # ============================================
 
 def admin_required(f):
-    """Decorator to require admin role (blocks guest users)"""
+    """Decorator to require admin role (blocks guest and rep users)"""
+    from functools import wraps
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated or current_user.role in ['guest', 'rep']:
+            flash('You need administrator access to view this page.', 'error')
+            return redirect(url_for('index'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def rep_or_admin_required(f):
+    """Decorator to require rep or admin role (blocks only guest users)"""
     from functools import wraps
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated or current_user.role == 'guest':
-            flash('You need administrator access to view this page.', 'error')
+            flash('You need representative or administrator access to view this page.', 'error')
             return redirect(url_for('index'))
         return f(*args, **kwargs)
     return decorated_function
@@ -116,10 +128,20 @@ def get_executive_title(email):
     """Get the executive title for a given email from database"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    cursor.execute("SELECT title FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (email,))
+    cursor.execute("SELECT title, role FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (email,))
     result = cursor.fetchone()
     conn.close()
     return result[0] if result else email
+
+
+def get_executive_role(email):
+    """Get the role for a given email from database (admin or rep)"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("SELECT role FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (email,))
+    result = cursor.fetchone()
+    conn.close()
+    return result[0] if result else 'admin'  # Default to admin for backwards compatibility
 
 
 def get_authorized_emails():
@@ -225,12 +247,13 @@ def register():
                 flash('An account with this email already exists.', 'error')
                 conn.close()
             else:
-                # Create new user
+                # Create new user with correct role from database
+                user_role = get_executive_role(email)
                 password_hash = generate_password_hash(password)
                 cursor.execute("""
                     INSERT INTO USERS (email, password_hash, role)
-                    VALUES (?, ?, 'admin')
-                """, (email, password_hash))
+                    VALUES (?, ?, ?)
+                """, (email, password_hash, user_role))
                 conn.commit()
                 conn.close()
 
@@ -260,6 +283,8 @@ def manage_executives():
         if action == 'add':
             new_email = request.form.get('new_email')
             new_title = request.form.get('new_title')
+            new_role = request.form.get('new_role', 'admin')
+            new_grade = request.form.get('new_grade', None)
 
             if not new_email or not new_title:
                 flash('Email and title are required', 'error')
@@ -267,14 +292,16 @@ def manage_executives():
                 flash('Please enter a valid email address', 'error')
             elif not new_email.lower().endswith('@asbarcelona.com'):
                 flash('Only @asbarcelona.com email addresses are allowed', 'error')
+            elif new_role == 'rep' and not new_grade:
+                flash('Grade level is required for representatives', 'error')
             else:
                 conn = sqlite3.connect(DB_PATH)
                 cursor = conn.cursor()
                 try:
                     cursor.execute("""
-                        INSERT INTO AUTHORIZED_EXECUTIVES (email, title)
-                        VALUES (?, ?)
-                    """, (new_email.lower(), new_title))
+                        INSERT INTO AUTHORIZED_EXECUTIVES (email, title, role, grade_level)
+                        VALUES (?, ?, ?, ?)
+                    """, (new_email.lower(), new_title, new_role, new_grade))
                     conn.commit()
                     flash(f'Successfully added {new_email} as {new_title}', 'success')
                 except sqlite3.IntegrityError:
@@ -317,8 +344,20 @@ def manage_executives():
         return redirect(url_for('manage_executives'))
 
     # GET request - display the management page
-    executives = get_all_authorized_executives()
-    return render_template('manage_executives.html', executives=executives)
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # Get admins (executives)
+    cursor.execute("SELECT email, title, added_at FROM AUTHORIZED_EXECUTIVES WHERE role = 'admin' ORDER BY added_at")
+    executives = cursor.fetchall()
+
+    # Get reps (representatives)
+    cursor.execute("SELECT email, title, added_at, grade_level FROM AUTHORIZED_EXECUTIVES WHERE role = 'rep' ORDER BY grade_level, added_at")
+    reps = cursor.fetchall()
+
+    conn.close()
+
+    return render_template('manage_executives.html', executives=executives, reps=reps)
 
 
 @app.route('/year_end_reset', methods=['GET', 'POST'])
@@ -954,7 +993,7 @@ def delete_event(event_id):
 
 @app.route('/add-event', methods=['GET', 'POST'])
 @login_required
-@admin_required
+@rep_or_admin_required
 def add_event():
     """Add a new event with results"""
     if request.method == 'POST':
@@ -1004,7 +1043,7 @@ def add_event():
 
 @app.route('/quick-points', methods=['GET', 'POST'])
 @login_required
-@admin_required
+@rep_or_admin_required
 def quick_points():
     """Quick points input without creating an event"""
     if request.method == 'POST':

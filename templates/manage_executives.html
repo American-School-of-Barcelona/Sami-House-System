@@ -4,73 +4,174 @@
 
 {% block content %}
     <h2>Manage Executive Access</h2>
-    <p style="margin-bottom: 20px; color: #e8e8d0;">Add or remove Student Council Executive members who can create accounts.</p>
+    <p style="margin-bottom: 30px; color: #e8e8d0;">Add or remove Student Council Executive members and House Representatives who can create accounts.</p>
 
-    <!-- Add New Executive -->
-    <div style="background: #3a3a3a; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
-        <h3 style="color: #e8e8d0; margin-bottom: 20px;">Add New Executive</h3>
-        <form method="POST" action="{{ url_for('manage_executives') }}">
-            <input type="hidden" name="action" value="add">
-
-            <div class="form-group">
-                <label for="new_email">Email:</label>
-                <input type="email" id="new_email" name="new_email" required placeholder="example@asbarcelona.com">
-            </div>
-
-            <div class="form-group">
-                <label for="new_title">Title:</label>
-                <select id="new_title" name="new_title" required>
-                    <option value="">Select a title...</option>
-                    <option value="Student Council President">Student Council President</option>
-                    <option value="Student Council Vice President">Student Council Vice President</option>
-                    <option value="Student Council Secretary">Student Council Secretary</option>
-                    <option value="Student Council Treasurer">Student Council Treasurer</option>
-                    <option value="Student Council Director of Public Relations">Student Council Director of Public Relations</option>
-                    <option value="Student Council Executive">Student Council Executive</option>
-                </select>
-            </div>
-
-            <button type="submit">Add Executive</button>
-        </form>
+    <!-- Tab Navigation with query parameters -->
+    {% set current_tab = request.args.get('tab', 'executives') %}
+    <div style="display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #555;">
+        <a href="{{ url_for('manage_executives', tab='executives') }}" style="padding: 15px 30px; background: {% if current_tab == 'executives' %}#e8e8d0{% else %}#555{% endif %}; color: {% if current_tab == 'executives' %}#2b2b2b{% else %}#fff{% endif %}; border: none; border-radius: 10px 10px 0 0; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block;">Executive Team</a>
+        <a href="{{ url_for('manage_executives', tab='reps') }}" style="padding: 15px 30px; background: {% if current_tab == 'reps' %}#e8e8d0{% else %}#555{% endif %}; color: {% if current_tab == 'reps' %}#2b2b2b{% else %}#fff{% endif %}; border: none; border-radius: 10px 10px 0 0; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block;">Representatives</a>
     </div>
 
-    <!-- Current Executives -->
-    <h3 style="color: #e8e8d0; margin-bottom: 15px;">Current Authorized Executives</h3>
-    <table>
-        <thead>
-            <tr>
-                <th>Email</th>
-                <th>Title</th>
-                <th>Added Date</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for email, title, added_at in executives %}
-            <tr>
-                <td><strong>{{ email }}</strong></td>
-                <td>{{ title }}</td>
-                <td>{{ added_at[:10] if added_at else 'N/A' }}</td>
-                <td>
-                    <form method="POST" action="{{ url_for('manage_executives') }}" style="display: inline;" onsubmit="return confirm('{% if email.lower() == current_user.email.lower() %}WARNING: You are removing your own access. You will be logged out and will no longer be able to access the admin panel. Are you sure?{% else %}Are you sure you want to remove {{ email }} from authorized executives? Their account will also be deleted if it exists.{% endif %}');">
-                        <input type="hidden" name="action" value="remove">
-                        <input type="hidden" name="remove_email" value="{{ email }}">
-                        <button type="submit" class="btn" style="background: #d64968; padding: 5px 10px; font-size: 14px;">
-                            {% if email.lower() == current_user.email.lower() %}Remove My Access{% else %}Remove{% endif %}
-                        </button>
-                    </form>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <!-- Executive Team Tab -->
+    {% if current_tab == 'executives' %}
+    <div>
+        <!-- Add New Executive -->
+        <div style="background: #3a3a3a; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
+            <h3 style="color: #e8e8d0; margin-bottom: 20px;">Add New Executive</h3>
+            <form method="POST" action="{{ url_for('manage_executives', tab='executives') }}">
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" name="new_role" value="admin">
 
-    <p style="margin-top: 20px; color: #e8e8d0;">
-        Total Executives: {{ executives|length }}
-    </p>
+                <div class="form-group">
+                    <label for="new_email">Email:</label>
+                    <input type="email" id="new_email" name="new_email" required placeholder="example@asbarcelona.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="new_title">Title:</label>
+                    <select id="new_title" name="new_title" required>
+                        <option value="">Select a title...</option>
+                        <option value="Student Council President">Student Council President</option>
+                        <option value="Student Council Vice President">Student Council Vice President</option>
+                        <option value="Student Council Secretary">Student Council Secretary</option>
+                        <option value="Student Council Treasurer">Student Council Treasurer</option>
+                        <option value="Student Council Director of Public Relations">Student Council Director of Public Relations</option>
+                        <option value="Student Council Executive">Student Council Executive</option>
+                    </select>
+                </div>
+
+                <button type="submit">Add Executive</button>
+            </form>
+        </div>
+
+        <!-- Current Executives -->
+        <h3 style="color: #e8e8d0; margin-bottom: 15px;">Current Executive Team</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Title</th>
+                    <th>Added Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for email, title, added_at in executives %}
+                <tr>
+                    <td><strong>{{ email }}</strong></td>
+                    <td>{{ title }}</td>
+                    <td>{{ added_at[:10] if added_at else 'N/A' }}</td>
+                    <td>
+                        <form method="POST" action="{{ url_for('manage_executives', tab='executives') }}" style="display: inline;" onsubmit="return confirm('{% if email.lower() == current_user.email.lower() %}WARNING: You are removing your own access. You will be logged out and will no longer be able to access the admin panel. Are you sure?{% else %}Are you sure you want to remove {{ email }} from authorized executives? Their account will also be deleted if it exists.{% endif %}');">
+                            <input type="hidden" name="action" value="remove">
+                            <input type="hidden" name="remove_email" value="{{ email }}">
+                            <button type="submit" class="btn" style="background: #d64968; padding: 5px 10px; font-size: 14px;">
+                                {% if email.lower() == current_user.email.lower() %}Remove My Access{% else %}Remove{% endif %}
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p style="margin-top: 20px; color: #e8e8d0;">
+            Total Executives: {{ executives|length }}
+        </p>
+    </div>
+    {% endif %}
+
+    <!-- Representatives Tab -->
+    {% if current_tab == 'reps' %}
+    <div>
+        <!-- Add New Representative -->
+        <div style="background: #3a3a3a; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
+            <h3 style="color: #e8e8d0; margin-bottom: 20px;">Add New Representative</h3>
+            <form method="POST" action="{{ url_for('manage_executives', tab='reps') }}">
+                <input type="hidden" name="action" value="add">
+                <input type="hidden" name="new_role" value="rep">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group">
+                        <label for="new_email_rep">Email:</label>
+                        <input type="email" id="new_email_rep" name="new_email" required placeholder="example@asbarcelona.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="new_grade">Grade Level:</label>
+                        <select id="new_grade" name="new_grade" required>
+                            <option value="">Select grade...</option>
+                            <option value="9th">9th Grade</option>
+                            <option value="10th">10th Grade</option>
+                            <option value="11th">11th Grade</option>
+                            <option value="12th">12th Grade</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="new_title_rep">Title:</label>
+                    <select id="new_title_rep" name="new_title" required>
+                        <option value="">Select grade level above...</option>
+                        <option value="9th Grade Representative">9th Grade Representative</option>
+                        <option value="10th Grade Representative">10th Grade Representative</option>
+                        <option value="11th Grade Representative">11th Grade Representative</option>
+                        <option value="12th Grade Representative">12th Grade Representative</option>
+                    </select>
+                </div>
+
+                <button type="submit">Add Representative</button>
+            </form>
+        </div>
+
+        <!-- Current Representatives by Grade -->
+        <h3 style="color: #e8e8d0; margin-bottom: 15px;">Current House Representatives</h3>
+
+        {% set grades = ['9th', '10th', '11th', '12th'] %}
+        {% for grade in grades %}
+            {% set grade_reps = reps|selectattr(3, 'equalto', grade)|list %}
+            {% if grade_reps %}
+            <div style="background: #3a3a3a; padding: 20px; border-radius: 15px; margin-bottom: 20px;">
+                <h4 style="color: #e8e8d0; margin-bottom: 15px;">{{ grade }} Grade Representatives ({{ grade_reps|length }})</h4>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Email</th>
+                            <th>Title</th>
+                            <th>Added Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for email, title, added_at, grade_level in grade_reps %}
+                        <tr>
+                            <td><strong>{{ email }}</strong></td>
+                            <td>{{ title }}</td>
+                            <td>{{ added_at[:10] if added_at else 'N/A' }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('manage_executives', tab='reps') }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to remove {{ email }} from authorized representatives? Their account will also be deleted if it exists.');">
+                                    <input type="hidden" name="action" value="remove">
+                                    <input type="hidden" name="remove_email" value="{{ email }}">
+                                    <button type="submit" class="btn" style="background: #d64968; padding: 5px 10px; font-size: 14px;">Remove</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        {% endfor %}
+
+        <p style="margin-top: 20px; color: #e8e8d0;">
+            Total Representatives: {{ reps|length }}
+        </p>
+    </div>
+    {% endif %}
 
     <div style="background: #fff3cd; padding: 15px; margin-top: 20px; border-radius: 8px; border-left: 4px solid #ffc107; color: #555;">
-        <strong>⚠️ Warning:</strong> Removing an executive will delete their authorization and their account (if they have registered). If you remove your own access, you will be immediately logged out and cannot access the admin panel again.
+        <strong>⚠️ Warning:</strong> Removing an executive or representative will delete their authorization and their account (if they have registered). If you remove your own access, you will be immediately logged out and cannot access the admin panel again.
     </div>
 
     <div style="margin-top: 30px;">
