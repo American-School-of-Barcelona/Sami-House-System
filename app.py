@@ -394,7 +394,7 @@ def year_end_reset():
     cursor.execute("SELECT COUNT(*) FROM EVENTS")
     events_count = cursor.fetchone()[0]
 
-    cursor.execute("SELECT SUM(points) FROM EVENT_RESULTS")
+    cursor.execute("SELECT SUM(points_earned) FROM EVENT_RESULTS")
     total_points = cursor.fetchone()[0] or 0
 
     conn.close()
