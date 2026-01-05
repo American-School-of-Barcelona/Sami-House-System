@@ -6,6 +6,29 @@
     <h2 style="color: #d64968; margin-bottom: 20px;">⚠️ Year-End Reset</h2>
     <p style="margin-bottom: 30px; color: #e8e8d0; font-size: 1.1em;">This will prepare the system for a new school year.</p>
 
+    <!-- Backup and Restore Section -->
+    <div style="background: #d4edda; padding: 20px; margin-bottom: 30px; border-radius: 10px; border-left: 5px solid #28a745; color: #155724;">
+        <h3 style="color: #155724; margin-bottom: 15px;">💾 Backup & Restore</h3>
+        <p style="margin-bottom: 15px;"><strong>Test safely:</strong> Create a backup before testing the reset, then restore if needed.</p>
+        <div style="display: flex; gap: 15px;">
+            <form method="POST" action="{{ url_for('year_end_reset') }}" style="flex: 1;">
+                <input type="hidden" name="action" value="backup">
+                <button type="submit" style="width: 100%; background: #28a745; color: #fff; padding: 12px; font-size: 1em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">
+                    💾 Create Backup Now
+                </button>
+            </form>
+            <form method="POST" action="{{ url_for('year_end_reset') }}" style="flex: 1;" onsubmit="return confirm('Are you sure you want to restore from the latest backup? This will undo any changes made after the backup.');">
+                <input type="hidden" name="action" value="restore">
+                <button type="submit" style="width: 100%; background: #17a2b8; color: #fff; padding: 12px; font-size: 1em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">
+                    ↩️ Restore Latest Backup
+                </button>
+            </form>
+        </div>
+        <p style="margin-top: 10px; font-size: 0.9em; color: #155724;">
+            💡 <strong>Tip:</strong> The reset will automatically create a backup, but you can create one manually here to test safely.
+        </p>
+    </div>
+
     <div style="background: #fff3cd; padding: 20px; margin-bottom: 30px; border-radius: 10px; border-left: 5px solid #ffc107; color: #555;">
         <h3 style="color: #856404; margin-bottom: 15px;">⚠️ WARNING: This action cannot be undone!</h3>
         <p style="margin-bottom: 10px;"><strong>The following will happen when you confirm:</strong></p>
@@ -57,6 +80,7 @@
     </div>
 
     <form method="POST" action="{{ url_for('year_end_reset') }}" style="background: #3a3a3a; padding: 30px; border-radius: 15px;">
+        <input type="hidden" name="action" value="reset">
         <h3 style="color: #e8e8d0; margin-bottom: 20px;">Confirm Year-End Reset</h3>
         <p style="margin-bottom: 20px; color: #fff;">To confirm this action, please type <strong style="color: #d64968;">RESET</strong> in the box below:</p>
 

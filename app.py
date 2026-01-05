@@ -12,6 +12,8 @@ from flask_login import LoginManager, UserMixin, login_user, logout_user, login_
 from werkzeug.security import generate_password_hash, check_password_hash
 import sqlite3
 import os
+import shutil
+from datetime import datetime
 
 # Import our database handler
 import sys
@@ -322,60 +324,112 @@ def manage_executives():
 def year_end_reset():
     """Year-end reset: Remove seniors, promote students, reset all points"""
     if request.method == 'POST':
-        confirm = request.form.get('confirm')
+        action = request.form.get('action')
 
-        if confirm == 'RESET':
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-
+        if action == 'backup':
+            # Create backup
             try:
-                # Get current year to identify seniors
-                cursor.execute("SELECT MIN(grad_year) FROM CLASS_YEARS")
-                senior_year = cursor.fetchone()[0]
+                backup_dir = os.path.join('playground', 'backups')
+                os.makedirs(backup_dir, exist_ok=True)
 
-                # Count what will be affected
-                cursor.execute("SELECT COUNT(*) FROM STUDENTS WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)", (senior_year,))
-                seniors_count = cursor.fetchone()[0]
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_file = os.path.join(backup_dir, f'testhouse_backup_{timestamp}.db')
 
-                cursor.execute("SELECT COUNT(*) FROM EVENTS")
-                events_count = cursor.fetchone()[0]
-
-                # Step 1: Delete all seniors
-                cursor.execute("""
-                    DELETE FROM STUDENTS
-                    WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)
-                """, (senior_year,))
-
-                # Step 2: Delete all events and event results (resets all points)
-                cursor.execute("DELETE FROM EVENT_RESULTS")
-                cursor.execute("DELETE FROM EVENTS")
-
-                # Step 3: Promote all remaining students (decrease grad_year by 1)
-                cursor.execute("UPDATE CLASS_YEARS SET grad_year = grad_year - 1")
-
-                # Step 4: Update class names to reflect new year
-                cursor.execute("""
-                    UPDATE CLASS_YEARS
-                    SET class_name = CASE
-                        WHEN display_order = 1 THEN 'Senior'
-                        WHEN display_order = 2 THEN 'Junior'
-                        WHEN display_order = 3 THEN 'Sophomore'
-                        WHEN display_order = 4 THEN 'Freshman'
-                    END
-                """)
-
-                conn.commit()
-
-                flash(f'Year-end reset completed successfully! Removed {seniors_count} seniors, deleted {events_count} events, and promoted all remaining students.', 'success')
-                return redirect(url_for('index'))
-
+                shutil.copy2(DB_PATH, backup_file)
+                flash(f'Backup created successfully: {os.path.basename(backup_file)}', 'success')
             except Exception as e:
-                conn.rollback()
-                flash(f'Error during year-end reset: {str(e)}', 'error')
-            finally:
-                conn.close()
-        else:
-            flash('Reset cancelled. You must type "RESET" to confirm.', 'error')
+                flash(f'Error creating backup: {str(e)}', 'error')
+            return redirect(url_for('year_end_reset'))
+
+        elif action == 'restore':
+            # Restore from latest backup
+            try:
+                backup_dir = os.path.join('playground', 'backups')
+                if not os.path.exists(backup_dir):
+                    flash('No backups found', 'error')
+                    return redirect(url_for('year_end_reset'))
+
+                backups = [f for f in os.listdir(backup_dir) if f.startswith('testhouse_backup_') and f.endswith('.db')]
+                if not backups:
+                    flash('No backups found', 'error')
+                    return redirect(url_for('year_end_reset'))
+
+                latest_backup = max(backups)
+                backup_path = os.path.join(backup_dir, latest_backup)
+
+                shutil.copy2(backup_path, DB_PATH)
+                flash(f'Database restored from backup: {latest_backup}', 'success')
+                return redirect(url_for('index'))
+            except Exception as e:
+                flash(f'Error restoring backup: {str(e)}', 'error')
+            return redirect(url_for('year_end_reset'))
+
+        elif action == 'reset':
+            confirm = request.form.get('confirm')
+
+            if confirm == 'RESET':
+                # Create automatic backup before reset
+                try:
+                    backup_dir = os.path.join('playground', 'backups')
+                    os.makedirs(backup_dir, exist_ok=True)
+
+                    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                    backup_file = os.path.join(backup_dir, f'testhouse_before_reset_{timestamp}.db')
+                    shutil.copy2(DB_PATH, backup_file)
+                except Exception as e:
+                    flash(f'Warning: Could not create automatic backup: {str(e)}', 'error')
+
+                conn = sqlite3.connect(DB_PATH)
+                cursor = conn.cursor()
+
+                try:
+                    # Get current year to identify seniors
+                    cursor.execute("SELECT MIN(grad_year) FROM CLASS_YEARS")
+                    senior_year = cursor.fetchone()[0]
+
+                    # Count what will be affected
+                    cursor.execute("SELECT COUNT(*) FROM STUDENTS WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)", (senior_year,))
+                    seniors_count = cursor.fetchone()[0]
+
+                    cursor.execute("SELECT COUNT(*) FROM EVENTS")
+                    events_count = cursor.fetchone()[0]
+
+                    # Step 1: Delete all seniors
+                    cursor.execute("""
+                        DELETE FROM STUDENTS
+                        WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)
+                    """, (senior_year,))
+
+                    # Step 2: Delete all events and event results (resets all points)
+                    cursor.execute("DELETE FROM EVENT_RESULTS")
+                    cursor.execute("DELETE FROM EVENTS")
+
+                    # Step 3: Promote all remaining students (decrease grad_year by 1)
+                    cursor.execute("UPDATE CLASS_YEARS SET grad_year = grad_year - 1")
+
+                    # Step 4: Update class names to reflect new year
+                    cursor.execute("""
+                        UPDATE CLASS_YEARS
+                        SET class_name = CASE
+                            WHEN display_order = 1 THEN 'Senior'
+                            WHEN display_order = 2 THEN 'Junior'
+                            WHEN display_order = 3 THEN 'Sophomore'
+                            WHEN display_order = 4 THEN 'Freshman'
+                        END
+                    """)
+
+                    conn.commit()
+
+                    flash(f'Year-end reset completed! Removed {seniors_count} seniors, deleted {events_count} events, and promoted all remaining students. Backup saved automatically.', 'success')
+                    return redirect(url_for('index'))
+
+                except Exception as e:
+                    conn.rollback()
+                    flash(f'Error during year-end reset: {str(e)}', 'error')
+                finally:
+                    conn.close()
+            else:
+                flash('Reset cancelled. You must type "RESET" to confirm.', 'error')
 
     # GET request - show confirmation page with statistics
     conn = sqlite3.connect(DB_PATH)
