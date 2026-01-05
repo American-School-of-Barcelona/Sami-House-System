@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Bulk Import Students - House Points System{% endblock %}
+
+{% block content %}
+    <h2>Bulk Import Students</h2>
+    <p style="margin-bottom: 30px; color: #e8e8d0;">Quickly add multiple students at once using CSV upload or homeroom-based entry.</p>
+
+    <!-- CSV Upload Section -->
+    <div style="background: #3a3a3a; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
+        <h3 style="color: #e8e8d0; margin-bottom: 20px;">📄 Option 1: CSV Upload</h3>
+        <p style="margin-bottom: 20px; color: #fff;">Upload a CSV file with student information. Perfect for importing entire grade levels at the start of the year.</p>
+
+        <div style="background: #d4edda; padding: 15px; margin-bottom: 20px; border-radius: 8px; border-left: 4px solid #28a745; color: #155724;">
+            <strong>CSV Format Required:</strong>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li><code>first_name</code> - Student's first name</li>
+                <li><code>last_name</code> - Student's last name</li>
+                <li><code>email</code> - Student's email address</li>
+                <li><code>house</code> - House name (Athena, Poseidon, Artemis, or Apollo)</li>
+                <li><code>class_year</code> - Class year (Freshman, Sophomore, Junior, or Senior)</li>
+            </ul>
+            <p style="margin-top: 10px; margin-bottom: 0;"><strong>Example CSV:</strong></p>
+            <pre style="background: #fff; color: #333; padding: 10px; border-radius: 5px; margin-top: 5px; overflow-x: auto;">first_name,last_name,email,house,class_year
+John,Smith,john.smith@asbarcelona.com,Athena,Freshman
+Emily,Johnson,emily.johnson@asbarcelona.com,Poseidon,Freshman
+Michael,Williams,michael.williams@asbarcelona.com,Artemis,Freshman</pre>
+        </div>
+
+        <form method="POST" action="{{ url_for('bulk_import') }}" enctype="multipart/form-data">
+            <input type="hidden" name="import_type" value="csv">
+
+            <div class="form-group">
+                <label for="csv_file">Select CSV File:</label>
+                <input type="file" id="csv_file" name="csv_file" accept=".csv" required style="background: #2b2b2b; border: 2px solid #555; color: #fff; padding: 10px; border-radius: 8px; width: 100%;">
+            </div>
+
+            <button type="submit" style="background: #28a745; color: #fff; padding: 12px 30px; font-size: 1em; font-weight: bold; border: none; border-radius: 10px; cursor: pointer;">
+                📤 Upload and Import CSV
+            </button>
+        </form>
+
+        <details style="margin-top: 20px;">
+            <summary style="cursor: pointer; color: #e8e8d0; font-weight: bold;">📥 Download CSV Template</summary>
+            <p style="margin-top: 10px; color: #fff;">Copy this template and save it as a .csv file:</p>
+            <textarea readonly style="width: 100%; height: 100px; background: #2b2b2b; color: #fff; border: 1px solid #555; padding: 10px; border-radius: 5px; font-family: monospace; margin-top: 5px;">first_name,last_name,email,house,class_year
+John,Smith,john.smith@asbarcelona.com,Athena,Freshman
+Emily,Johnson,emily.johnson@asbarcelona.com,Poseidon,Freshman</textarea>
+        </details>
+    </div>
+
+    <!-- Homeroom Bulk Add Section -->
+    <div style="background: #3a3a3a; padding: 30px; border-radius: 15px; margin-bottom: 30px;">
+        <h3 style="color: #e8e8d0; margin-bottom: 20px;">🏠 Option 2: Homeroom Bulk Add</h3>
+        <p style="margin-bottom: 20px; color: #fff;">Quickly add multiple students from the same homeroom/house. Perfect for transfer students or quick additions.</p>
+
+        <div style="background: #d1ecf1; padding: 15px; margin-bottom: 20px; border-radius: 8px; border-left: 4px solid #17a2b8; color: #0c5460;">
+            <strong>How it works:</strong>
+            <ol style="margin-left: 20px; margin-top: 10px; margin-bottom: 0;">
+                <li>Select the house and class year for all students</li>
+                <li>Enter student names (one per line or comma-separated)</li>
+                <li>Email addresses are automatically generated as firstname.lastname@asbarcelona.com</li>
+            </ol>
+        </div>
+
+        <form method="POST" action="{{ url_for('bulk_import') }}">
+            <input type="hidden" name="import_type" value="homeroom">
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <div class="form-group">
+                    <label for="house_id">House (Homeroom):</label>
+                    <select id="house_id" name="house_id" required>
+                        <option value="">Select House...</option>
+                        {% for house_id, house_name, color in houses %}
+                        <option value="{{ house_id }}">{{ house_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="class_year_id">Class Year:</label>
+                    <select id="class_year_id" name="class_year_id" required>
+                        <option value="">Select Class Year...</option>
+                        {% for class_year_id, class_name, grad_year in class_years %}
+                        <option value="{{ class_year_id }}">{{ class_name }} ({{ grad_year }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="students_text">Student Names (one per line):</label>
+                <textarea id="students_text" name="students_text" rows="10" required placeholder="John Smith
+Emily Johnson
+Michael Williams
+Sarah Davis
+...
+
+Or use commas:
+John, Smith
+Emily, Johnson" style="background: #2b2b2b; border: 2px solid #555; color: #fff; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px; font-family: monospace;"></textarea>
+                <small style="color: #999; display: block; margin-top: 5px;">
+                    💡 Tip: Enter "FirstName LastName" on each line, or use "FirstName, LastName" format
+                </small>
+            </div>
+
+            <button type="submit" style="background: #17a2b8; color: #fff; padding: 12px 30px; font-size: 1em; font-weight: bold; border: none; border-radius: 10px; cursor: pointer;">
+                ➕ Add Students to House
+            </button>
+        </form>
+    </div>
+
+    <!-- Tips Section -->
+    <div style="background: #fff3cd; padding: 20px; margin-bottom: 30px; border-radius: 10px; border-left: 5px solid #ffc107; color: #555;">
+        <h3 style="color: #856404; margin-bottom: 15px;">💡 Tips for Bulk Import</h3>
+        <ul style="margin-left: 20px; line-height: 1.8;">
+            <li><strong>CSV Method:</strong> Best for importing 50+ students at once, especially at the start of the year</li>
+            <li><strong>Homeroom Method:</strong> Best for smaller groups or when all students are in the same house</li>
+            <li><strong>Duplicate Protection:</strong> The system will show errors for duplicate email addresses</li>
+            <li><strong>House Names:</strong> Must match exactly: Athena, Poseidon, Artemis, or Apollo (case-insensitive)</li>
+            <li><strong>Class Years:</strong> Must be: Freshman, Sophomore, Junior, or Senior (case-insensitive)</li>
+        </ul>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <a href="{{ url_for('students') }}" class="btn btn-secondary" style="display: inline-block; background: #555; color: #fff; padding: 12px 30px; text-decoration: none; border-radius: 10px; font-weight: bold;">← Back to Students</a>
+    </div>
+{% endblock %}

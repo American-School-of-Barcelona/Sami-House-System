@@ -1,12 +1,12 @@
 -- Sample Data for House Points Dashboard
 -- SQLite3 syntax
 
--- Insert Class Years (current school year 2024-2025)
+-- Insert Class Years (current school year 2025-2026)
 INSERT INTO CLASS_YEARS (grad_year, class_name, display_order) VALUES
-(2025, 'Senior', 1),
-(2026, 'Junior', 2),
-(2027, 'Sophomore', 3),
-(2028, 'Freshman', 4);
+(2026, 'Senior', 1),
+(2027, 'Junior', 2),
+(2028, 'Sophomore', 3),
+(2029, 'Freshman', 4);
 
 -- Insert Houses
 INSERT INTO HOUSES (house_name, logo_sq, logo_large, color) VALUES
@@ -74,30 +74,3 @@ INSERT INTO STUDENTS (fname, lname, email, house_id, class_year_id) VALUES
 ('Amelia', 'Myers', 'amyers@school.edu', 4, 4),
 ('Wyatt', 'Warren', 'wwarren@school.edu', 4, 4);
 
--- Insert Events
-INSERT INTO EVENTS (event_date, event_desc, event_type) VALUES
-('2024-09-15', 'Knockout Pop-up', 'sports'),
-('2024-10-22', 'House Trivia Contest', 'academic'),
-('2024-11-08', 'House Karaoke Sing-off', 'arts');
-
--- Insert Event Results
--- Event 1: Knockout Pop-up (Artemis dominates athletics!)
-INSERT INTO EVENT_RESULTS (event_id, house_id, points_earned, rank) VALUES
-(1, 3, 400, 1),  -- Artemis wins
-(1, 2, 300, 2),  -- Poseidon second
-(1, 4, 200, 3),  -- Apollo third
-(1, 1, 100, 4);  -- Athena fourth
-
--- Event 2: House Trivia Contest (Athena claims wisdom!)
-INSERT INTO EVENT_RESULTS (event_id, house_id, points_earned, rank) VALUES
-(2, 1, 400, 1),  -- Athena wins
-(2, 4, 300, 2),  -- Apollo second
-(2, 3, 200, 3),  -- Artemis third
-(2, 2, 100, 4);  -- Poseidon fourth
-
--- Event 3: House Karaoke Sing-off (Apollo brings the music!)
-INSERT INTO EVENT_RESULTS (event_id, house_id, points_earned, rank) VALUES
-(3, 4, 400, 1),  -- Apollo wins
-(3, 3, 300, 2),  -- Artemis second
-(3, 1, 200, 3),  -- Athena third
-(3, 2, 100, 4);  -- Poseidon fourth

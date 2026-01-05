@@ -10,9 +10,12 @@ Then visit: http://localhost:5000
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 import sqlite3
 import os
 import shutil
+import csv
+import io
 from datetime import datetime
 
 # Import our database handler
@@ -544,53 +547,317 @@ def students():
 @login_required
 @admin_required
 def add_student():
-    """Add new students"""
+    """Add new students - supports manual, CSV, and homeroom methods"""
     if request.method == 'POST':
-        # Get the number of students
-        student_count = int(request.form.get('student_count', 1))
+        import_type = request.form.get('import_type', 'manual')
 
-        added_students = []
-        errors = []
+        if import_type == 'csv':
+            # CSV Upload (from bulk_import functionality)
+            if 'csv_file' not in request.files:
+                flash('No file uploaded', 'error')
+                return redirect(url_for('add_student'))
 
-        # Process each student
-        for i in range(student_count):
-            fname = request.form.get(f'fname_{i}')
-            lname = request.form.get(f'lname_{i}')
-            email = request.form.get(f'email_{i}')
-            house_id = request.form.get(f'house_id_{i}')
-            class_year_id = request.form.get(f'class_year_id_{i}')
+            file = request.files['csv_file']
+            if file.filename == '':
+                flash('No file selected', 'error')
+                return redirect(url_for('add_student'))
 
-            # Validate
-            if not all([fname, lname, email, house_id, class_year_id]):
-                errors.append(f'Student {i + 1}: All fields are required')
-                continue
+            if not file.filename.endswith('.csv'):
+                flash('Please upload a CSV file', 'error')
+                return redirect(url_for('add_student'))
 
             try:
-                # Add student to database
-                student_id = db.add_student(fname, lname, email, int(house_id), int(class_year_id))
-                added_students.append(f'{fname} {lname}')
-            except Exception as e:
-                errors.append(f'Student {i + 1} ({fname} {lname}): {str(e)}')
+                # Read CSV file with UTF-8 encoding
+                stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
+                csv_reader = csv.DictReader(stream)
 
-        # Show results
-        if added_students:
-            if len(added_students) == 1:
-                flash(f'Successfully added {added_students[0]}!', 'success')
-            else:
+                # Get houses and class years for mapping
+                houses_dict = {h[1].lower(): h[0] for h in get_all_houses()}
+                class_years_dict = {cy[1].lower(): cy[0] for cy in get_all_class_years()}
+
+                added_students = []
+                errors = []
+                line_num = 1
+
+                for row in csv_reader:
+                    line_num += 1
+                    try:
+                        fname = row.get('first_name', '').strip()
+                        lname = row.get('last_name', '').strip()
+                        email = row.get('email', '').strip()
+                        house_name = row.get('house', '').strip().lower()
+                        class_year_name = row.get('class_year', '').strip().lower()
+
+                        if not all([fname, lname, email, house_name, class_year_name]):
+                            errors.append(f'Line {line_num}: Missing required fields')
+                            continue
+
+                        if house_name not in houses_dict:
+                            errors.append(f'Line {line_num}: Invalid house "{house_name}"')
+                            continue
+
+                        if class_year_name not in class_years_dict:
+                            errors.append(f'Line {line_num}: Invalid class year "{class_year_name}"')
+                            continue
+
+                        house_id = houses_dict[house_name]
+                        class_year_id = class_years_dict[class_year_name]
+
+                        db.add_student(fname, lname, email, house_id, class_year_id)
+                        added_students.append(f'{fname} {lname}')
+
+                    except Exception as e:
+                        errors.append(f'Line {line_num}: {str(e)}')
+
+                if added_students:
+                    flash(f'Successfully imported {len(added_students)} students!', 'success')
+
+                if errors:
+                    flash(f'{len(errors)} errors occurred. First few: {"; ".join(errors[:5])}', 'error')
+
+                if added_students:
+                    return redirect(url_for('students'))
+
+            except Exception as e:
+                flash(f'Error processing CSV file: {str(e)}', 'error')
+                return redirect(url_for('add_student'))
+
+        elif import_type == 'homeroom':
+            # Homeroom Bulk Add
+            house_id = request.form.get('house_id')
+            class_year_id = request.form.get('class_year_id')
+            students_text = request.form.get('students_text', '')
+
+            if not house_id or not class_year_id:
+                flash('Please select both house and class year', 'error')
+                return redirect(url_for('add_student'))
+
+            if not students_text.strip():
+                flash('Please enter student names', 'error')
+                return redirect(url_for('add_student'))
+
+            lines = students_text.strip().split('\n')
+            added_students = []
+            errors = []
+
+            for i, line in enumerate(lines, 1):
+                line = line.strip()
+                if not line:
+                    continue
+
+                if ',' in line:
+                    parts = [p.strip() for p in line.split(',')]
+                else:
+                    parts = line.split()
+
+                if len(parts) < 2:
+                    errors.append(f'Line {i}: Need at least first and last name')
+                    continue
+
+                fname = parts[0]
+                lname = ' '.join(parts[1:])
+                email = f'{fname.lower()}.{lname.lower().replace(" ", "")}@asbarcelona.com'
+
+                try:
+                    db.add_student(fname, lname, email, int(house_id), int(class_year_id))
+                    added_students.append(f'{fname} {lname}')
+                except Exception as e:
+                    errors.append(f'Line {i} ({fname} {lname}): {str(e)}')
+
+            if added_students:
                 flash(f'Successfully added {len(added_students)} students!', 'success')
 
-        if errors:
-            for error in errors:
-                flash(error, 'error')
+            if errors:
+                for error in errors[:10]:
+                    flash(error, 'error')
 
-        if added_students:
-            return redirect(url_for('students'))
+            if added_students:
+                return redirect(url_for('students'))
 
-    # Get houses and class years for the form
+        else:  # manual
+            student_count = int(request.form.get('student_count', 1))
+
+            added_students = []
+            errors = []
+
+            for i in range(student_count):
+                fname = request.form.get(f'fname_{i}')
+                lname = request.form.get(f'lname_{i}')
+                email = request.form.get(f'email_{i}')
+                house_id = request.form.get(f'house_id_{i}')
+                class_year_id = request.form.get(f'class_year_id_{i}')
+
+                if not all([fname, lname, email, house_id, class_year_id]):
+                    errors.append(f'Student {i + 1}: All fields are required')
+                    continue
+
+                try:
+                    student_id = db.add_student(fname, lname, email, int(house_id), int(class_year_id))
+                    added_students.append(f'{fname} {lname}')
+                except Exception as e:
+                    errors.append(f'Student {i + 1} ({fname} {lname}): {str(e)}')
+
+            if added_students:
+                if len(added_students) == 1:
+                    flash(f'Successfully added {added_students[0]}!', 'success')
+                else:
+                    flash(f'Successfully added {len(added_students)} students!', 'success')
+
+            if errors:
+                for error in errors:
+                    flash(error, 'error')
+
+            if added_students:
+                return redirect(url_for('students'))
+
     houses = get_all_houses()
     class_years = get_all_class_years()
 
     return render_template('add_student.html', houses=houses, class_years=class_years)
+
+
+@app.route('/bulk-import', methods=['GET', 'POST'])
+@login_required
+@admin_required
+def bulk_import():
+    """Bulk import students via CSV or homeroom"""
+    if request.method == 'POST':
+        import_type = request.form.get('import_type')
+
+        if import_type == 'csv':
+            # CSV Upload
+            if 'csv_file' not in request.files:
+                flash('No file uploaded', 'error')
+                return redirect(url_for('bulk_import'))
+
+            file = request.files['csv_file']
+            if file.filename == '':
+                flash('No file selected', 'error')
+                return redirect(url_for('bulk_import'))
+
+            if not file.filename.endswith('.csv'):
+                flash('Please upload a CSV file', 'error')
+                return redirect(url_for('bulk_import'))
+
+            try:
+                # Read CSV file with UTF-8 encoding
+                stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
+                csv_reader = csv.DictReader(stream)
+
+                # Get houses and class years for mapping
+                houses = {h[1].lower(): h[0] for h in get_all_houses()}  # {name: id}
+                class_years = {cy[1].lower(): cy[0] for cy in get_all_class_years()}  # {name: id}
+
+                added_students = []
+                errors = []
+                line_num = 1
+
+                for row in csv_reader:
+                    line_num += 1
+                    try:
+                        fname = row.get('first_name', '').strip()
+                        lname = row.get('last_name', '').strip()
+                        email = row.get('email', '').strip()
+                        house_name = row.get('house', '').strip().lower()
+                        class_year_name = row.get('class_year', '').strip().lower()
+
+                        # Validate required fields
+                        if not all([fname, lname, email, house_name, class_year_name]):
+                            errors.append(f'Line {line_num}: Missing required fields')
+                            continue
+
+                        # Map house and class year names to IDs
+                        if house_name not in houses:
+                            errors.append(f'Line {line_num}: Invalid house "{house_name}"')
+                            continue
+
+                        if class_year_name not in class_years:
+                            errors.append(f'Line {line_num}: Invalid class year "{class_year_name}"')
+                            continue
+
+                        house_id = houses[house_name]
+                        class_year_id = class_years[class_year_name]
+
+                        # Add student
+                        db.add_student(fname, lname, email, house_id, class_year_id)
+                        added_students.append(f'{fname} {lname}')
+
+                    except Exception as e:
+                        errors.append(f'Line {line_num}: {str(e)}')
+
+                # Show results
+                if added_students:
+                    flash(f'Successfully imported {len(added_students)} students!', 'success')
+
+                if errors:
+                    flash(f'{len(errors)} errors occurred. First few: {"; ".join(errors[:5])}', 'error')
+
+                if added_students:
+                    return redirect(url_for('students'))
+
+            except Exception as e:
+                flash(f'Error processing CSV file: {str(e)}', 'error')
+                return redirect(url_for('bulk_import'))
+
+        elif import_type == 'homeroom':
+            # Homeroom Bulk Add
+            house_id = request.form.get('house_id')
+            class_year_id = request.form.get('class_year_id')
+            students_text = request.form.get('students_text', '')
+
+            if not house_id or not class_year_id:
+                flash('Please select both house and class year', 'error')
+                return redirect(url_for('bulk_import'))
+
+            if not students_text.strip():
+                flash('Please enter student names', 'error')
+                return redirect(url_for('bulk_import'))
+
+            # Parse student names (one per line or comma-separated)
+            lines = students_text.strip().split('\n')
+            added_students = []
+            errors = []
+
+            for i, line in enumerate(lines, 1):
+                line = line.strip()
+                if not line:
+                    continue
+
+                # Split by comma if present, otherwise by space
+                if ',' in line:
+                    parts = [p.strip() for p in line.split(',')]
+                else:
+                    parts = line.split()
+
+                if len(parts) < 2:
+                    errors.append(f'Line {i}: Need at least first and last name')
+                    continue
+
+                fname = parts[0]
+                lname = ' '.join(parts[1:])  # Handle multi-part last names
+                email = f'{fname.lower()}.{lname.lower().replace(" ", "")}@asbarcelona.com'
+
+                try:
+                    db.add_student(fname, lname, email, int(house_id), int(class_year_id))
+                    added_students.append(f'{fname} {lname}')
+                except Exception as e:
+                    errors.append(f'Line {i} ({fname} {lname}): {str(e)}')
+
+            # Show results
+            if added_students:
+                flash(f'Successfully added {len(added_students)} students!', 'success')
+
+            if errors:
+                for error in errors[:10]:  # Show first 10 errors
+                    flash(error, 'error')
+
+            if added_students:
+                return redirect(url_for('students'))
+
+    # GET request - show the form
+    houses = get_all_houses()
+    class_years = get_all_class_years()
+    return render_template('bulk_import.html', houses=houses, class_years=class_years)
 
 
 @app.route('/events')
