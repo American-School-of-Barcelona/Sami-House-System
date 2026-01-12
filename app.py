@@ -147,7 +147,7 @@ def get_executive_role(email):
 def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
     """
     Suggest the best house for a new student based on:
-    1. 9th graders -> their homeroom teacher's house
+    1. 9th graders -> their homeroom's house (9A=Artemis, 9B=Athena, 9C=Poseidon, 9D=Apollo)
     2. Sibling matching -> same house as existing student with same last name
     3. Balance -> house with fewest students
 
@@ -158,19 +158,24 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
 
     # PRIORITY 1: Check if 9th grader with homeroom
     if grade == '9' and homeroom:
-        # Look up which house this homeroom belongs to
-        cursor.execute("""
-            SELECT DISTINCT s.house_id, h.house_name
-            FROM STUDENTS s
-            JOIN HOUSES h ON s.house_id = h.house_id
-            WHERE s.homeroom = ? AND s.house_id IS NOT NULL
-            LIMIT 1
-        """, (homeroom,))
-        result = cursor.fetchone()
+        # Map homeroom to house: 9A=Artemis, 9B=Athena, 9C=Poseidon, 9D=Apollo
+        homeroom_mapping = {
+            '9A': 'Artemis',
+            '9B': 'Athena',
+            '9C': 'Poseidon',
+            '9D': 'Apollo'
+        }
 
-        if result:
-            conn.close()
-            return (result[0], result[1], f"9th grader - assigned to homeroom {homeroom}'s house")
+        homeroom_upper = homeroom.upper()
+        if homeroom_upper in homeroom_mapping:
+            house_name = homeroom_mapping[homeroom_upper]
+            # Get the house_id for this house
+            cursor.execute("SELECT house_id FROM HOUSES WHERE house_name = ?", (house_name,))
+            result = cursor.fetchone()
+
+            if result:
+                conn.close()
+                return (result[0], house_name, f"9th grader in homeroom {homeroom_upper} - assigned to {house_name}")
 
     # PRIORITY 2: Check for siblings (same last name)
     cursor.execute("""
@@ -823,12 +828,14 @@ def add_student():
         suggest_fname = request.args.get('suggest_fname', '')
         suggest_lname = request.args.get('suggest_lname', '')
         suggest_grade = request.args.get('suggest_grade', '')
+        suggest_homeroom = request.args.get('suggest_homeroom', '')
 
         if suggest_lname and suggest_grade:
             house_id, house_name, reason = suggest_house_for_student(
                 suggest_fname,
                 suggest_lname,
-                suggest_grade
+                suggest_grade,
+                suggest_homeroom if suggest_homeroom else None
             )
 
             if house_id:
