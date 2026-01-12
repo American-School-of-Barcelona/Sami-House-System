@@ -144,6 +144,71 @@ def get_executive_role(email):
     return result[0] if result else 'admin'  # Default to admin for backwards compatibility
 
 
+def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
+    """
+    Suggest the best house for a new student based on:
+    1. 9th graders -> their homeroom teacher's house
+    2. Sibling matching -> same house as existing student with same last name
+    3. Balance -> house with fewest students
+
+    Returns: (suggested_house_id, suggested_house_name, reason)
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+
+    # PRIORITY 1: Check if 9th grader with homeroom
+    if grade == '9' and homeroom:
+        # Look up which house this homeroom belongs to
+        cursor.execute("""
+            SELECT DISTINCT s.house_id, h.house_name
+            FROM STUDENTS s
+            JOIN HOUSES h ON s.house_id = h.house_id
+            WHERE s.homeroom = ? AND s.house_id IS NOT NULL
+            LIMIT 1
+        """, (homeroom,))
+        result = cursor.fetchone()
+
+        if result:
+            conn.close()
+            return (result[0], result[1], f"9th grader - assigned to homeroom {homeroom}'s house")
+
+    # PRIORITY 2: Check for siblings (same last name)
+    cursor.execute("""
+        SELECT s.house_id, h.house_name, s.fname
+        FROM STUDENTS s
+        JOIN HOUSES h ON s.house_id = h.house_id
+        WHERE LOWER(s.lname) = LOWER(?) AND s.house_id IS NOT NULL
+        LIMIT 1
+    """, (last_name,))
+    sibling = cursor.fetchone()
+
+    if sibling:
+        house_id, house_name, sibling_name = sibling
+        conn.close()
+        return (house_id, house_name, f"Sibling match - {sibling_name} {last_name} is in {house_name}")
+
+    # PRIORITY 3: Balance houses - assign to house with fewest students
+    cursor.execute("""
+        SELECT s.house_id, h.house_name, COUNT(*) as count
+        FROM STUDENTS s
+        JOIN HOUSES h ON s.house_id = h.house_id
+        WHERE s.house_id IS NOT NULL
+        GROUP BY s.house_id, h.house_name
+        ORDER BY count ASC
+    """)
+    house_counts = cursor.fetchall()
+    conn.close()
+
+    if house_counts:
+        smallest_house_id = house_counts[0][0]
+        smallest_house_name = house_counts[0][1]
+        smallest_count = house_counts[0][2]
+        return (smallest_house_id, smallest_house_name, f"Balanced distribution - {smallest_house_name} has fewest students ({smallest_count})")
+
+    # Fallback: if no students exist yet, return None
+    return (None, None, "No existing students to base assignment on")
+
+
 def get_authorized_emails():
     """Get list of authorized executive emails from database"""
     conn = sqlite3.connect(DB_PATH)
@@ -752,7 +817,28 @@ def add_student():
     houses = get_all_houses()
     class_years = get_all_class_years()
 
-    return render_template('add_student.html', houses=houses, class_years=class_years)
+    # Handle house suggestion request
+    suggestion = None
+    if request.args.get('get_suggestion') == '1':
+        suggest_fname = request.args.get('suggest_fname', '')
+        suggest_lname = request.args.get('suggest_lname', '')
+        suggest_grade = request.args.get('suggest_grade', '')
+
+        if suggest_lname and suggest_grade:
+            house_id, house_name, reason = suggest_house_for_student(
+                suggest_fname,
+                suggest_lname,
+                suggest_grade
+            )
+
+            if house_id:
+                suggestion = {
+                    'house_id': house_id,
+                    'house_name': house_name,
+                    'reason': reason
+                }
+
+    return render_template('add_student.html', houses=houses, class_years=class_years, suggestion=suggestion)
 
 
 @app.route('/bulk-import', methods=['GET', 'POST'])

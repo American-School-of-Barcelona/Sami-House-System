@@ -13,7 +13,9 @@
       "Bash(venv/Scripts/python.exe -c \"import sqlite3; conn = sqlite3.connect\\(''playground/testhouse.db''\\); cursor = conn.cursor\\(\\); cursor.execute\\(''SELECT class_year_id, class_name, grad_year FROM CLASS_YEARS ORDER BY display_order''\\); print\\(''\\\\n''.join\\([f''{row[0]}: {row[1]} - Graduating {row[2]}'' for row in cursor.fetchall\\(\\)]\\)\\); conn.close\\(\\)\")",
       "Bash(venv/Scripts/python.exe:*)",
       "Bash(venv/Scripts/pip:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(python -m py_compile:*)",
+      "Bash(python:*)"
     ]
   }
 }

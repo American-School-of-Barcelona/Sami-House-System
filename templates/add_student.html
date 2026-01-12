@@ -17,6 +17,15 @@
     <!-- Manual Entry Tab -->
     {% if current_tab == 'manual' %}
     <div>
+        <!-- House Suggestion Helper -->
+        {% if suggestion %}
+        <div style="background: #4a5f4a; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #90ee90;">
+            <h3 style="color: #90ee90; margin-bottom: 10px;">💡 House Suggestion</h3>
+            <p style="color: #e8e8d0; margin-bottom: 10px;"><strong>Suggested House:</strong> {{ suggestion.house_name }}</p>
+            <p style="color: #c8c8b0; font-size: 14px;"><strong>Reason:</strong> {{ suggestion.reason }}</p>
+        </div>
+        {% endif %}
+
         <form method="POST" action="{{ url_for('add_student', tab='manual') }}">
             <input type="hidden" name="import_type" value="manual">
             <input type="hidden" name="student_count" value="1">
@@ -27,12 +36,12 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div class="form-group">
                         <label for="fname_0">First Name:</label>
-                        <input type="text" id="fname_0" name="fname_0" required>
+                        <input type="text" id="fname_0" name="fname_0" value="{{ request.args.get('suggest_fname', '') }}" required>
                     </div>
 
                     <div class="form-group">
                         <label for="lname_0">Last Name:</label>
-                        <input type="text" id="lname_0" name="lname_0" required>
+                        <input type="text" id="lname_0" name="lname_0" value="{{ request.args.get('suggest_lname', '') }}" required>
                     </div>
                 </div>
 
@@ -47,7 +56,7 @@
                         <select id="house_id_0" name="house_id_0" required>
                             <option value="">-- Select a House --</option>
                             {% for house_id, house_name, color in houses %}
-                            <option value="{{ house_id }}">{{ house_name }}</option>
+                            <option value="{{ house_id }}" {% if suggestion and suggestion.house_id == house_id %}selected{% endif %}>{{ house_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -57,7 +66,7 @@
                         <select id="class_year_id_0" name="class_year_id_0" required>
                             <option value="">-- Select a Class Year --</option>
                             {% for class_year_id, class_name, grad_year in class_years %}
-                            <option value="{{ class_year_id }}">{{ class_name }} ({{ grad_year }})</option>
+                            <option value="{{ class_year_id }}" {% if request.args.get('suggest_grade') and class_name.startswith(request.args.get('suggest_grade')) %}selected{% endif %}>{{ class_name }} ({{ grad_year }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -69,6 +78,42 @@
                 <a href="{{ url_for('students') }}" class="btn btn-secondary">Cancel</a>
             </div>
         </form>
+
+        <!-- Get House Suggestion Form -->
+        <div style="background: #3a3a3a; padding: 20px; border-radius: 10px; margin-top: 30px; border-top: 2px solid #555;">
+            <h3 style="color: #e8e8d0; margin-bottom: 15px;">🔍 Get House Suggestion</h3>
+            <p style="color: #c8c8b0; margin-bottom: 15px; font-size: 14px;">Enter student details to get an automatic house suggestion based on siblings, grade, or balance.</p>
+
+            <form method="GET" action="{{ url_for('add_student', tab='manual') }}">
+                <input type="hidden" name="tab" value="manual">
+                <input type="hidden" name="get_suggestion" value="1">
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="suggest_fname_input">First Name:</label>
+                        <input type="text" id="suggest_fname_input" name="suggest_fname" placeholder="Optional" value="{{ request.args.get('suggest_fname', '') }}">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="suggest_lname_input">Last Name:</label>
+                        <input type="text" id="suggest_lname_input" name="suggest_lname" required value="{{ request.args.get('suggest_lname', '') }}">
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label for="suggest_grade_input">Grade:</label>
+                        <select id="suggest_grade_input" name="suggest_grade" required>
+                            <option value="">Select...</option>
+                            <option value="9" {% if request.args.get('suggest_grade') == '9' %}selected{% endif %}>9th</option>
+                            <option value="10" {% if request.args.get('suggest_grade') == '10' %}selected{% endif %}>10th</option>
+                            <option value="11" {% if request.args.get('suggest_grade') == '11' %}selected{% endif %}>11th</option>
+                            <option value="12" {% if request.args.get('suggest_grade') == '12' %}selected{% endif %}>12th</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" style="margin-bottom: 0;">Get Suggestion</button>
+                </div>
+            </form>
+        </div>
     </div>
     {% endif %}
 
