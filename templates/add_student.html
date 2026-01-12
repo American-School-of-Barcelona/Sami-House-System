@@ -19,10 +19,32 @@
     <div>
         <!-- House Suggestion Helper -->
         {% if suggestion %}
-        <div style="background: #4a5f4a; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #90ee90;">
-            <h3 style="color: #90ee90; margin-bottom: 10px;">💡 House Suggestion</h3>
+        {% set siblings_split = suggestion.reason.startswith('Siblings split') %}
+        <div style="background: {% if siblings_split %}#5f5f4a{% else %}#4a5f4a{% endif %}; padding: 20px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid {% if siblings_split %}#ffeb3b{% else %}#90ee90{% endif %};">
+            <h3 style="color: {% if siblings_split %}#ffeb3b{% else %}#90ee90{% endif %}; margin-bottom: 10px;">
+                {% if siblings_split %}⚠️{% else %}💡{% endif %} House Suggestion
+            </h3>
             <p style="color: #e8e8d0; margin-bottom: 10px;"><strong>Suggested House:</strong> {{ suggestion.house_name }}</p>
-            <p style="color: #c8c8b0; font-size: 14px;"><strong>Reason:</strong> {{ suggestion.reason }}</p>
+            <p style="color: #c8c8b0; font-size: 14px; margin-bottom: 10px;"><strong>Reason:</strong> {{ suggestion.reason }}</p>
+
+            {% if siblings_split %}
+            <div style="background: #4a4a3a; padding: 12px; border-radius: 8px; margin-top: 12px; border-left: 3px solid #ffeb3b;">
+                <p style="color: #ffeb3b; font-size: 13px; margin: 0;">
+                    <strong>⚠️ Note:</strong> Siblings are in different houses. Review the list below and choose the appropriate house for this student.
+                </p>
+            </div>
+            {% endif %}
+
+            {% if suggestion.siblings %}
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #6a7a6a;">
+                <p style="color: #e8e8d0; font-size: 14px; margin-bottom: 8px;"><strong>Found {{ suggestion.siblings|length }} sibling(s) with this last name:</strong></p>
+                <ul style="color: #c8c8b0; font-size: 14px; margin-left: 20px;">
+                    {% for fname, house_name, grade in suggestion.siblings %}
+                    <li>{{ fname }} - {{ grade }} (<strong style="color: #e8e8d0;">{{ house_name }}</strong>)</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
         </div>
         {% endif %}
 

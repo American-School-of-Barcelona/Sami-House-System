@@ -151,7 +151,8 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
     2. Sibling matching -> same house as existing student with same last name
     3. Balance -> house with fewest students
 
-    Returns: (suggested_house_id, suggested_house_name, reason)
+    Returns: (suggested_house_id, suggested_house_name, reason, siblings_list)
+    siblings_list is a list of tuples: [(first_name, house_name, grade), ...]
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -175,22 +176,100 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
 
             if result:
                 conn.close()
-                return (result[0], house_name, f"9th grader in homeroom {homeroom_upper} - assigned to {house_name}")
+                return (result[0], house_name, f"9th grader in homeroom {homeroom_upper} - assigned to {house_name}", [])
 
-    # PRIORITY 2: Check for siblings (same last name)
+    # PRIORITY 2: Check for siblings (same last name) - get ALL siblings
     cursor.execute("""
-        SELECT s.house_id, h.house_name, s.fname
+        SELECT s.fname, h.house_name, cy.class_name, s.house_id
         FROM STUDENTS s
         JOIN HOUSES h ON s.house_id = h.house_id
+        JOIN CLASS_YEARS cy ON s.class_year_id = cy.class_year_id
         WHERE LOWER(s.lname) = LOWER(?) AND s.house_id IS NOT NULL
-        LIMIT 1
+        ORDER BY cy.grad_year DESC, s.fname
     """, (last_name,))
-    sibling = cursor.fetchone()
+    siblings = cursor.fetchall()
 
-    if sibling:
-        house_id, house_name, sibling_name = sibling
-        conn.close()
-        return (house_id, house_name, f"Sibling match - {sibling_name} {last_name} is in {house_name}")
+    if siblings:
+        # Format siblings list for display
+        siblings_list = [(fname, hname, grade) for fname, hname, grade, _ in siblings]
+
+        # Check if siblings are in multiple houses
+        unique_houses = {}  # house_id -> (house_name, count, [sibling_names])
+        for fname, hname, grade, hid in siblings:
+            if hid not in unique_houses:
+                unique_houses[hid] = (hname, 0, [])
+            house_info = unique_houses[hid]
+            unique_houses[hid] = (house_info[0], house_info[1] + 1, house_info[2] + [fname])
+
+        if len(unique_houses) == 1:
+            # All siblings in same house - suggest that house
+            house_id = siblings[0][3]
+            house_name = siblings[0][1]
+
+            if len(siblings) == 1:
+                reason = f"Sibling match - {siblings[0][0]} {last_name} is in {house_name}"
+            else:
+                sibling_names = ", ".join([f"{s[0]}" for s in siblings])
+                reason = f"Sibling match - {len(siblings)} siblings found ({sibling_names}) in {house_name}"
+
+            conn.close()
+            return (house_id, house_name, reason, siblings_list)
+        else:
+            # Siblings split across multiple houses - suggest both with counts
+            house_options = []
+            for hid, (hname, count, names) in unique_houses.items():
+                house_options.append((hid, hname, count, names))
+
+            # Sort by count (descending) - suggest the house with most siblings first
+            house_options.sort(key=lambda x: x[2], reverse=True)
+
+            # Check if there's a tie (equal number of siblings in top houses)
+            top_sibling_count = house_options[0][2]
+            tied_houses = [h for h in house_options if h[2] == top_sibling_count]
+
+            if len(tied_houses) > 1:
+                # Tie detected - use total house population as tiebreaker
+                # Get total student counts for tied houses
+                house_totals = {}
+                for hid, hname, sib_count, names in tied_houses:
+                    cursor.execute("""
+                        SELECT COUNT(*)
+                        FROM STUDENTS
+                        WHERE house_id = ?
+                    """, (hid,))
+                    total_count = cursor.fetchone()[0]
+                    house_totals[hid] = (hname, sib_count, names, total_count)
+
+                # Sort tied houses by total population (ascending - prefer smaller house)
+                tied_houses_with_totals = [(hid, hname, sib_count, names, house_totals[hid][3])
+                                           for hid, hname, sib_count, names in tied_houses]
+                tied_houses_with_totals.sort(key=lambda x: x[4])  # Sort by total count
+
+                # Primary suggestion is the tied house with fewest total students
+                primary_house_id = tied_houses_with_totals[0][0]
+                primary_house_name = tied_houses_with_totals[0][1]
+                primary_total = tied_houses_with_totals[0][4]
+
+                # Build reason message showing both houses with totals
+                house_breakdown = []
+                for hid, hname, count, names in house_options:
+                    house_breakdown.append(f"{hname} ({count}: {', '.join(names)})")
+
+                reason = f"Siblings split across {len(unique_houses)} houses - {' | '.join(house_breakdown)}. Tied at {top_sibling_count} sibling(s) each, suggesting {primary_house_name} (fewer total students: {primary_total})"
+            else:
+                # No tie - suggest house with most siblings
+                primary_house_id = house_options[0][0]
+                primary_house_name = house_options[0][1]
+
+                # Build reason message showing both houses
+                house_breakdown = []
+                for hid, hname, count, names in house_options:
+                    house_breakdown.append(f"{hname} ({count}: {', '.join(names)})")
+
+                reason = f"Siblings split across {len(unique_houses)} houses - {' | '.join(house_breakdown)}. Suggesting {primary_house_name} (most siblings)"
+
+            conn.close()
+            return (primary_house_id, primary_house_name, reason, siblings_list)
 
     # PRIORITY 3: Balance houses - assign to house with fewest students
     cursor.execute("""
@@ -208,10 +287,10 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
         smallest_house_id = house_counts[0][0]
         smallest_house_name = house_counts[0][1]
         smallest_count = house_counts[0][2]
-        return (smallest_house_id, smallest_house_name, f"Balanced distribution - {smallest_house_name} has fewest students ({smallest_count})")
+        return (smallest_house_id, smallest_house_name, f"Balanced distribution - {smallest_house_name} has fewest students ({smallest_count})", [])
 
     # Fallback: if no students exist yet, return None
-    return (None, None, "No existing students to base assignment on")
+    return (None, None, "No existing students to base assignment on", [])
 
 
 def get_authorized_emails():
@@ -831,7 +910,7 @@ def add_student():
         suggest_homeroom = request.args.get('suggest_homeroom', '')
 
         if suggest_lname and suggest_grade:
-            house_id, house_name, reason = suggest_house_for_student(
+            house_id, house_name, reason, siblings_list = suggest_house_for_student(
                 suggest_fname,
                 suggest_lname,
                 suggest_grade,
@@ -842,7 +921,8 @@ def add_student():
                 suggestion = {
                     'house_id': house_id,
                     'house_name': house_name,
-                    'reason': reason
+                    'reason': reason,
+                    'siblings': siblings_list
                 }
 
     return render_template('add_student.html', houses=houses, class_years=class_years, suggestion=suggestion)
