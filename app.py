@@ -1,6 +1,7 @@
 """
 Flask Web Application for House Points System
 No JavaScript - Pure HTML and Flask
+Using SQLAlchemy ORM instead of raw SQL queries
 
 Run with:
     python app.py
@@ -8,31 +9,30 @@ Then visit: http://localhost:5000
 """
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import sqlite3
 import os
 import shutil
 import csv
 import io
 from datetime import datetime
 
-# Import our database handler
-import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'playground'))
-from database_insert_guide import HousePointsDatabase
-from analysis_queries import HousePointsAnalyzer
-
+# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here-change-in-production'
 
-# Database path
-DB_PATH = os.path.join('playground', 'testhouse.db')
+# Database path - use absolute path for PythonAnywhere compatibility
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, 'playground', 'testhouse.db')
 
-# Initialize database handlers
-db = HousePointsDatabase(DB_PATH)
-analyzer = HousePointsAnalyzer(DB_PATH)
+# Configure SQLAlchemy
+app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{DB_PATH}'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+# Import and initialize SQLAlchemy models
+from models import db, House, ClassYear, Student, Event, EventResult, User, AuthorizedExecutive
+db.init_app(app)
 
 # Initialize Flask-Login
 login_manager = LoginManager()
@@ -42,38 +42,46 @@ login_manager.login_message = 'Please log in to access this page.'
 
 
 # ============================================
-# USER CLASS FOR FLASK-LOGIN
+# GUEST USER CLASS FOR FLASK-LOGIN
 # ============================================
 
-class User(UserMixin):
-    """User class for Flask-Login"""
-    def __init__(self, user_id, email, role):
-        self.id = user_id
-        self.email = email
-        self.role = role
+class GuestUser:
+    """Guest user class for Flask-Login (not stored in database)"""
+    def __init__(self):
+        self.id = 'guest'
+        self.email = 'Guest'
+        self.role = 'guest'
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return 'guest'
 
     @property
     def username(self):
-        """Backwards compatibility - return email as username"""
         return self.email
 
 
 @login_manager.user_loader
 def load_user(user_id):
-    """Load user from database"""
+    """Load user from database using ORM"""
     # Special case for guest user
     if user_id == 'guest':
-        return User('guest', 'Guest', 'guest')
+        return GuestUser()
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id, email, role FROM USERS WHERE user_id = ?", (user_id,))
-    user_data = cursor.fetchone()
-    conn.close()
-
-    if user_data:
-        return User(user_data[0], user_data[1], user_data[2])
-    return None
+    # Use SQLAlchemy ORM to get user
+    user = User.get_by_id(user_id)
+    return user
 
 
 # ============================================
@@ -105,43 +113,27 @@ def rep_or_admin_required(f):
 
 
 def get_all_houses():
-    """Get all houses from database"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT house_id, house_name, color FROM HOUSES ORDER BY house_name")
-    houses = cursor.fetchall()
-    conn.close()
-    return houses
+    """Get all houses from database using ORM"""
+    houses = House.query.order_by(House.house_name).all()
+    return [(h.house_id, h.house_name, h.color) for h in houses]
 
 
 def get_all_class_years():
-    """Get all class years from database"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT class_year_id, class_name, grad_year FROM CLASS_YEARS ORDER BY display_order")
-    class_years = cursor.fetchall()
-    conn.close()
-    return class_years
+    """Get all class years from database using ORM"""
+    class_years = ClassYear.query.order_by(ClassYear.display_order).all()
+    return [(cy.class_year_id, cy.class_name, cy.grad_year) for cy in class_years]
 
 
 def get_executive_title(email):
-    """Get the executive title for a given email from database"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT title, role FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (email,))
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else email
+    """Get the executive title for a given email from database using ORM"""
+    executive = AuthorizedExecutive.get_by_email(email)
+    return executive.title if executive else email
 
 
 def get_executive_role(email):
-    """Get the role for a given email from database (admin or rep)"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT role FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (email,))
-    result = cursor.fetchone()
-    conn.close()
-    return result[0] if result else 'admin'  # Default to admin for backwards compatibility
+    """Get the role for a given email from database using ORM"""
+    executive = AuthorizedExecutive.get_by_email(email)
+    return executive.role if executive else 'admin'  # Default to admin for backwards compatibility
 
 
 def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
@@ -154,9 +146,6 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
     Returns: (suggested_house_id, suggested_house_name, reason, siblings_list)
     siblings_list is a list of tuples: [(first_name, house_name, grade), ...]
     """
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
     # PRIORITY 1: Check if 9th grader with homeroom
     if grade == '9' and homeroom:
         # Map homeroom to house: 9A=Artemis, 9B=Athena, 9C=Poseidon, 9D=Apollo
@@ -170,32 +159,35 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
         homeroom_upper = homeroom.upper()
         if homeroom_upper in homeroom_mapping:
             house_name = homeroom_mapping[homeroom_upper]
-            # Get the house_id for this house
-            cursor.execute("SELECT house_id FROM HOUSES WHERE house_name = ?", (house_name,))
-            result = cursor.fetchone()
+            # Get the house using ORM
+            house = House.query.filter_by(house_name=house_name).first()
 
-            if result:
-                conn.close()
-                return (result[0], house_name, f"9th grader in homeroom {homeroom_upper} - assigned to {house_name}", [])
+            if house:
+                return (house.house_id, house_name, f"9th grader in homeroom {homeroom_upper} - assigned to {house_name}", [])
 
-    # PRIORITY 2: Check for siblings (same last name) - get ALL siblings
-    cursor.execute("""
-        SELECT s.fname, h.house_name, cy.class_name, s.house_id
-        FROM STUDENTS s
-        JOIN HOUSES h ON s.house_id = h.house_id
-        JOIN CLASS_YEARS cy ON s.class_year_id = cy.class_year_id
-        WHERE LOWER(s.lname) = LOWER(?) AND s.house_id IS NOT NULL
-        ORDER BY cy.grad_year DESC, s.fname
-    """, (last_name,))
-    siblings = cursor.fetchall()
+    # PRIORITY 2: Check for siblings (same last name) - get ALL siblings using ORM
+    siblings_query = db.session.query(
+        Student.fname,
+        House.house_name,
+        ClassYear.class_name,
+        Student.house_id
+    ).join(House, Student.house_id == House.house_id
+    ).join(ClassYear, Student.class_year_id == ClassYear.class_year_id
+    ).filter(
+        db.func.lower(Student.lname) == last_name.lower(),
+        Student.house_id.isnot(None)
+    ).order_by(ClassYear.grad_year.desc(), Student.fname).all()
 
-    if siblings:
+    if siblings_query:
         # Format siblings list for display
-        siblings_list = [(fname, hname, grade) for fname, hname, grade, _ in siblings]
+        siblings_list = [(s.fname, s.house_name, s.class_name) for s in siblings_query]
 
         # Check if siblings are in multiple houses
         unique_houses = {}  # house_id -> (house_name, count, [sibling_names])
-        for fname, hname, grade, hid in siblings:
+        for s in siblings_query:
+            hid = s.house_id
+            hname = s.house_name
+            fname = s.fname
             if hid not in unique_houses:
                 unique_houses[hid] = (hname, 0, [])
             house_info = unique_houses[hid]
@@ -203,16 +195,16 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
 
         if len(unique_houses) == 1:
             # All siblings in same house - suggest that house
-            house_id = siblings[0][3]
-            house_name = siblings[0][1]
+            first_sibling = siblings_query[0]
+            house_id = first_sibling.house_id
+            house_name = first_sibling.house_name
 
-            if len(siblings) == 1:
-                reason = f"Sibling match - {siblings[0][0]} {last_name} is in {house_name}"
+            if len(siblings_query) == 1:
+                reason = f"Sibling match - {first_sibling.fname} {last_name} is in {house_name}"
             else:
-                sibling_names = ", ".join([f"{s[0]}" for s in siblings])
-                reason = f"Sibling match - {len(siblings)} siblings found ({sibling_names}) in {house_name}"
+                sibling_names = ", ".join([s.fname for s in siblings_query])
+                reason = f"Sibling match - {len(siblings_query)} siblings found ({sibling_names}) in {house_name}"
 
-            conn.close()
             return (house_id, house_name, reason, siblings_list)
         else:
             # Siblings split across multiple houses - suggest both with counts
@@ -229,15 +221,9 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
 
             if len(tied_houses) > 1:
                 # Tie detected - use total house population as tiebreaker
-                # Get total student counts for tied houses
                 house_totals = {}
                 for hid, hname, sib_count, names in tied_houses:
-                    cursor.execute("""
-                        SELECT COUNT(*)
-                        FROM STUDENTS
-                        WHERE house_id = ?
-                    """, (hid,))
-                    total_count = cursor.fetchone()[0]
+                    total_count = Student.query.filter_by(house_id=hid).count()
                     house_totals[hid] = (hname, sib_count, names, total_count)
 
                 # Sort tied houses by total population (ascending - prefer smaller house)
@@ -268,51 +254,286 @@ def suggest_house_for_student(first_name, last_name, grade, homeroom=None):
 
                 reason = f"Siblings split across {len(unique_houses)} houses - {' | '.join(house_breakdown)}. Suggesting {primary_house_name} (most siblings)"
 
-            conn.close()
             return (primary_house_id, primary_house_name, reason, siblings_list)
 
-    # PRIORITY 3: Balance houses - assign to house with fewest students
-    cursor.execute("""
-        SELECT s.house_id, h.house_name, COUNT(*) as count
-        FROM STUDENTS s
-        JOIN HOUSES h ON s.house_id = h.house_id
-        WHERE s.house_id IS NOT NULL
-        GROUP BY s.house_id, h.house_name
-        ORDER BY count ASC
-    """)
-    house_counts = cursor.fetchall()
-    conn.close()
+    # PRIORITY 3: Balance houses - assign to house with fewest students using ORM
+    house_counts = db.session.query(
+        Student.house_id,
+        House.house_name,
+        db.func.count(Student.student_id).label('count')
+    ).join(House, Student.house_id == House.house_id
+    ).filter(Student.house_id.isnot(None)
+    ).group_by(Student.house_id, House.house_name
+    ).order_by(db.func.count(Student.student_id).asc()).all()
 
     if house_counts:
-        smallest_house_id = house_counts[0][0]
-        smallest_house_name = house_counts[0][1]
-        smallest_count = house_counts[0][2]
-        return (smallest_house_id, smallest_house_name, f"Balanced distribution - {smallest_house_name} has fewest students ({smallest_count})", [])
+        smallest = house_counts[0]
+        return (smallest.house_id, smallest.house_name, f"Balanced distribution - {smallest.house_name} has fewest students ({smallest.count})", [])
 
     # Fallback: if no students exist yet, return None
     return (None, None, "No existing students to base assignment on", [])
 
 
 def get_authorized_emails():
-    """Get list of authorized executive emails from database"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT email FROM AUTHORIZED_EXECUTIVES")
-    emails = [row[0] for row in cursor.fetchall()]
-    conn.close()
-    return emails
+    """Get list of authorized executive emails from database using ORM"""
+    return AuthorizedExecutive.get_all_emails()
 
 
 def get_all_authorized_executives():
-    """Get all authorized executives with their titles"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("SELECT email, title, added_at FROM AUTHORIZED_EXECUTIVES ORDER BY added_at")
-    executives = cursor.fetchall()
-    conn.close()
-    return executives
+    """Get all authorized executives with their titles using ORM"""
+    executives = AuthorizedExecutive.query.order_by(AuthorizedExecutive.added_at).all()
+    return [(e.email, e.title, e.added_at) for e in executives]
 
 
+# ============================================
+# LEADERBOARD & ANALYSIS HELPER FUNCTIONS (ORM)
+# ============================================
+
+def get_house_points():
+    """
+    Get total points for each house, accounting for deductions.
+    Deduction events have event_type='deduction' and should be subtracted.
+    Returns: dict of {house_id: (house_name, total_points, color)}
+    """
+    # Get all houses first
+    houses = House.query.all()
+    house_dict = {h.house_id: (h.house_name, 0, h.color) for h in houses}
+
+    # Calculate points for each house
+    # Join EventResult with Event to check event_type
+    results = db.session.query(
+        EventResult.house_id,
+        Event.event_type,
+        db.func.sum(EventResult.points_earned).label('points')
+    ).join(Event, EventResult.event_id == Event.event_id
+    ).group_by(EventResult.house_id, Event.event_type).all()
+
+    # Process results - subtract deductions, add everything else
+    for result in results:
+        house_id = result.house_id
+        if house_id in house_dict:
+            house_name, current_points, color = house_dict[house_id]
+            if result.event_type == 'deduction':
+                current_points -= result.points
+            else:
+                current_points += result.points
+            house_dict[house_id] = (house_name, current_points, color)
+
+    return house_dict
+
+
+def get_winning_house():
+    """
+    Get the house with the most points.
+    Returns: tuple (house_name, color, points, events, wins) or None if no points
+    Template expects: winner[0]=name, winner[2]=points, winner[3]=events, winner[4]=wins
+    """
+    house_points = get_house_points()
+
+    if not house_points:
+        return None
+
+    # Find house with maximum points
+    winner_id = max(house_points.keys(), key=lambda x: house_points[x][1])
+    house_name, total_points, color = house_points[winner_id]
+
+    # Get event stats for winning house
+    results = db.session.query(
+        EventResult.rank,
+        db.func.count(EventResult.event_id).label('count')
+    ).filter(EventResult.house_id == winner_id
+    ).group_by(EventResult.rank).all()
+
+    events = sum(r.count for r in results)
+    wins = sum(r.count for r in results if r.rank == 1)
+
+    # Return tuple for template: (house_name, color, points, events, wins)
+    return (house_name, color, total_points, events, wins)
+
+
+def get_complete_leaderboard():
+    """
+    Get all houses ranked by total points.
+    Returns: list of tuples (rank, house_name, color, points, events, wins, second, third, fourth)
+    """
+    house_points = get_house_points()
+
+    # Get rank counts for each house (wins, second, third, fourth place finishes)
+    rank_counts = {}
+    for house_id in house_points.keys():
+        rank_counts[house_id] = {1: 0, 2: 0, 3: 0, 4: 0, 'events': 0}
+
+    # Query event results to count ranks
+    results = db.session.query(
+        EventResult.house_id,
+        EventResult.rank,
+        db.func.count(EventResult.event_id).label('count')
+    ).group_by(EventResult.house_id, EventResult.rank).all()
+
+    for result in results:
+        if result.house_id in rank_counts:
+            if result.rank in rank_counts[result.house_id]:
+                rank_counts[result.house_id][result.rank] = result.count
+            rank_counts[result.house_id]['events'] += result.count
+
+    # Sort by points descending
+    sorted_houses = sorted(house_points.items(), key=lambda x: x[1][1], reverse=True)
+
+    leaderboard = []
+    for rank, (house_id, (house_name, total_points, color)) in enumerate(sorted_houses, 1):
+        counts = rank_counts.get(house_id, {1: 0, 2: 0, 3: 0, 4: 0, 'events': 0})
+        # Return tuple: (rank, house_name, color, points, events, wins, second, third, fourth)
+        leaderboard.append((
+            rank,
+            house_name,
+            color,
+            total_points,
+            counts['events'],
+            counts[1],  # wins (1st place)
+            counts[2],  # second
+            counts[3],  # third
+            counts[4]   # fourth
+        ))
+
+    return leaderboard
+
+
+def get_standings_with_points_ahead():
+    """
+    Get leaderboard with points difference from leader.
+    Returns: list of tuples (rank, house_name, color, points, events, wins, second, third, fourth, points_behind)
+    """
+    leaderboard = get_complete_leaderboard()
+
+    if not leaderboard:
+        return []
+
+    # Leaderboard format: (rank, house_name, color, points, events, wins, second, third, fourth)
+    leader_points = leaderboard[0][3]  # points is at index 3
+
+    standings = []
+    for entry in leaderboard:
+        # Add points_behind as 10th element
+        points_behind = leader_points - entry[3]
+        standings.append(entry + (points_behind,))
+
+    return standings
+
+
+def get_students_by_house_standing():
+    """
+    Get students grouped by house ranking (1st place house, 2nd place house, etc.)
+    Returns: dict where keys are ranks (1, 2, 3, 4) and values are lists of student info
+    """
+    leaderboard = get_complete_leaderboard()
+
+    students_by_standing = {}
+
+    # Leaderboard format: (rank, house_name, color, points, events, wins, second, third, fourth)
+    for entry in leaderboard:
+        rank = entry[0]
+        house_name = entry[1]
+        color = entry[2]
+        total_points = entry[3]
+
+        # Get house by name to find house_id
+        house = House.query.filter_by(house_name=house_name).first()
+        if not house:
+            continue
+
+        # Get students in this house using ORM
+        students = db.session.query(
+            Student.student_id,
+            Student.fname,
+            Student.lname,
+            Student.email,
+            ClassYear.class_name
+        ).join(ClassYear, Student.class_year_id == ClassYear.class_year_id
+        ).filter(Student.house_id == house.house_id
+        ).order_by(Student.lname, Student.fname).all()
+
+        students_by_standing[rank] = {
+            'house_name': house_name,
+            'house_color': color,
+            'total_points': total_points,
+            'students': [(s.student_id, s.fname, s.lname, s.email, s.class_name) for s in students]
+        }
+
+    return students_by_standing
+
+
+def get_students_in_winning_house():
+    """
+    Get all students in the winning house.
+    Returns: list of tuples (student_name, email, house_name, color, class_name, grad_year, points)
+    Template expects this format for winning_students
+    """
+    winner = get_winning_house()
+
+    if not winner:
+        return []
+
+    # Winner is tuple: (house_name, color, points, events, wins)
+    house_name = winner[0]
+    color = winner[1]
+    points = winner[2]
+
+    house = House.query.filter_by(house_name=house_name).first()
+    if not house:
+        return []
+
+    students = db.session.query(
+        Student.fname,
+        Student.lname,
+        Student.email,
+        ClassYear.class_name,
+        ClassYear.grad_year
+    ).join(ClassYear, Student.class_year_id == ClassYear.class_year_id
+    ).filter(Student.house_id == house.house_id
+    ).order_by(Student.lname, Student.fname).all()
+
+    # Return format: (student_name, email, house_name, color, class_name, grad_year, points)
+    return [(f"{s.fname} {s.lname}", s.email, house_name, color, s.class_name, s.grad_year, points) for s in students]
+
+
+def get_winning_house_students_by_grade():
+    """
+    Get students in the winning house grouped by grade level.
+    Returns: list of tuples (class_name, grad_year, count, students_string)
+    Template expects this format for iteration
+    """
+    winner = get_winning_house()
+
+    if not winner:
+        return []
+
+    # Winner is tuple: (house_name, color, points, events, wins)
+    house_name = winner[0]
+    house = House.query.filter_by(house_name=house_name).first()
+    if not house:
+        return []
+
+    # Get all class years
+    class_years = ClassYear.query.order_by(ClassYear.display_order).all()
+
+    students_by_grade = []
+
+    for cy in class_years:
+        students = db.session.query(
+            Student.fname,
+            Student.lname
+        ).filter(
+            Student.house_id == house.house_id,
+            Student.class_year_id == cy.class_year_id
+        ).order_by(Student.lname, Student.fname).all()
+
+        count = len(students)
+        students_string = ", ".join([f"{s.fname} {s.lname}" for s in students]) if students else "None"
+
+        # Return format: (class_name, grad_year, count, students_string)
+        students_by_grade.append((cy.class_name, cy.grad_year, count, students_string))
+
+    return students_by_grade
 
 
 # ============================================
@@ -329,16 +550,11 @@ def login():
         email = request.form.get('email')
         password = request.form.get('password')
 
-        # Get user from database
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT user_id, email, password_hash, role FROM USERS WHERE email = ?", (email,))
-        user_data = cursor.fetchone()
-        conn.close()
+        # Get user from database using ORM
+        user = User.get_by_email(email)
 
         # Check if user exists and password is correct
-        if user_data and check_password_hash(user_data[2], password):
-            user = User(user_data[0], user_data[1], user_data[3])
+        if user and check_password_hash(user.password_hash, password):
             login_user(user)
             title = get_executive_title(email)
             flash(f'Welcome back, {title}!', 'success')
@@ -352,7 +568,7 @@ def login():
 @app.route('/guest')
 def guest_login():
     """Login as guest with limited access"""
-    guest_user = User('guest', 'Guest', 'guest')
+    guest_user = GuestUser()
     login_user(guest_user)
     flash('Logged in as Guest. You have limited access to view-only pages.', 'success')
     return redirect(url_for('index'))
@@ -369,7 +585,7 @@ def register():
         password = request.form.get('password')
         confirm_password = request.form.get('confirm_password')
 
-        # Get authorized emails from database
+        # Get authorized emails from database using ORM
         authorized_emails = get_authorized_emails()
 
         # Validate input
@@ -386,25 +602,22 @@ def register():
         elif password != confirm_password:
             flash('Passwords do not match', 'error')
         else:
-            # Check if email already exists
-            conn = sqlite3.connect(DB_PATH)
-            cursor = conn.cursor()
-            cursor.execute("SELECT user_id FROM USERS WHERE email = ?", (email,))
-            existing_user = cursor.fetchone()
+            # Check if email already exists using ORM
+            existing_user = User.get_by_email(email)
 
             if existing_user:
                 flash('An account with this email already exists.', 'error')
-                conn.close()
             else:
-                # Create new user with correct role from database
+                # Create new user with correct role from database using ORM
                 user_role = get_executive_role(email)
                 password_hash = generate_password_hash(password)
-                cursor.execute("""
-                    INSERT INTO USERS (email, password_hash, role)
-                    VALUES (?, ?, ?)
-                """, (email, password_hash, user_role))
-                conn.commit()
-                conn.close()
+                new_user = User(
+                    email=email,
+                    password_hash=password_hash,
+                    role=user_role
+                )
+                db.session.add(new_user)
+                db.session.commit()
 
                 flash('Account created successfully! You can now log in.', 'success')
                 return redirect(url_for('login'))
@@ -425,7 +638,7 @@ def logout():
 @login_required
 @admin_required
 def manage_executives():
-    """Manage authorized executive emails and titles"""
+    """Manage authorized executive emails and titles using ORM"""
     if request.method == 'POST':
         action = request.form.get('action')
 
@@ -444,67 +657,54 @@ def manage_executives():
             elif new_role == 'rep' and not new_grade:
                 flash('Grade level is required for representatives', 'error')
             else:
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                try:
-                    cursor.execute("""
-                        INSERT INTO AUTHORIZED_EXECUTIVES (email, title, role, grade_level)
-                        VALUES (?, ?, ?, ?)
-                    """, (new_email.lower(), new_title, new_role, new_grade))
-                    conn.commit()
-                    flash(f'Successfully added {new_email} as {new_title}', 'success')
-                except sqlite3.IntegrityError:
+                # Check if already exists
+                existing = AuthorizedExecutive.get_by_email(new_email)
+                if existing:
                     flash('This email is already authorized', 'error')
-                finally:
-                    conn.close()
+                else:
+                    new_exec = AuthorizedExecutive(
+                        email=new_email.lower(),
+                        title=new_title,
+                        role=new_role,
+                        grade_level=new_grade
+                    )
+                    db.session.add(new_exec)
+                    db.session.commit()
+                    flash(f'Successfully added {new_email} as {new_title}', 'success')
 
         elif action == 'remove':
             remove_email = request.form.get('remove_email')
             current_email = current_user.email
 
+            # Delete from authorized executives
+            exec_to_remove = AuthorizedExecutive.get_by_email(remove_email)
+            if exec_to_remove:
+                db.session.delete(exec_to_remove)
+
+            # Delete user account
+            user_to_remove = User.get_by_email(remove_email)
+            if user_to_remove:
+                db.session.delete(user_to_remove)
+
+            db.session.commit()
+
             if remove_email.lower() == current_email.lower():
-                # User is removing their own access
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-
-                # Delete from authorized executives
-                cursor.execute("DELETE FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (remove_email,))
-
-                # Delete user account
-                cursor.execute("DELETE FROM USERS WHERE LOWER(email) = LOWER(?)", (remove_email,))
-
-                conn.commit()
-                conn.close()
-
-                # Log them out
+                # User is removing their own access - log them out
                 logout_user()
                 flash('Your executive access has been removed. You have been logged out.', 'success')
                 return redirect(url_for('login'))
             else:
-                # Removing someone else's access
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-                cursor.execute("DELETE FROM AUTHORIZED_EXECUTIVES WHERE LOWER(email) = LOWER(?)", (remove_email,))
-                cursor.execute("DELETE FROM USERS WHERE LOWER(email) = LOWER(?)", (remove_email,))
-                conn.commit()
-                conn.close()
                 flash(f'Successfully removed {remove_email} from authorized executives', 'success')
 
         return redirect(url_for('manage_executives'))
 
-    # GET request - display the management page
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    # GET request - display the management page using ORM
+    executives = AuthorizedExecutive.query.filter_by(role='admin').order_by(AuthorizedExecutive.added_at).all()
+    # Convert datetime to string for template compatibility
+    executives = [(e.email, e.title, e.added_at.isoformat() if e.added_at else None) for e in executives]
 
-    # Get admins (executives)
-    cursor.execute("SELECT email, title, added_at FROM AUTHORIZED_EXECUTIVES WHERE role = 'admin' ORDER BY added_at")
-    executives = cursor.fetchall()
-
-    # Get reps (representatives)
-    cursor.execute("SELECT email, title, added_at, grade_level FROM AUTHORIZED_EXECUTIVES WHERE role = 'rep' ORDER BY grade_level, added_at")
-    reps = cursor.fetchall()
-
-    conn.close()
+    reps = AuthorizedExecutive.query.filter_by(role='rep').order_by(AuthorizedExecutive.grade_level, AuthorizedExecutive.added_at).all()
+    reps = [(r.email, r.title, r.added_at.isoformat() if r.added_at else None, r.grade_level) for r in reps]
 
     return render_template('manage_executives.html', executives=executives, reps=reps)
 
@@ -561,7 +761,7 @@ def year_end_reset():
             if confirm == 'RESET':
                 # Create automatic backup before reset
                 try:
-                    backup_dir = os.path.join('playground', 'backups')
+                    backup_dir = os.path.join(BASE_DIR, 'playground', 'backups')
                     os.makedirs(backup_dir, exist_ok=True)
 
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -570,79 +770,51 @@ def year_end_reset():
                 except Exception as e:
                     flash(f'Warning: Could not create automatic backup: {str(e)}', 'error')
 
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
-
                 try:
-                    # Get current year to identify seniors
-                    cursor.execute("SELECT MIN(grad_year) FROM CLASS_YEARS")
-                    senior_year = cursor.fetchone()[0]
+                    # Get current year to identify seniors using ORM
+                    senior_class = ClassYear.query.order_by(ClassYear.grad_year.asc()).first()
+                    senior_year = senior_class.grad_year if senior_class else None
 
                     # Count what will be affected
-                    cursor.execute("SELECT COUNT(*) FROM STUDENTS WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)", (senior_year,))
-                    seniors_count = cursor.fetchone()[0]
-
-                    cursor.execute("SELECT COUNT(*) FROM EVENTS")
-                    events_count = cursor.fetchone()[0]
+                    seniors_count = Student.query.filter_by(class_year_id=senior_class.class_year_id).count() if senior_class else 0
+                    events_count = Event.query.count()
 
                     # Step 1: Delete all seniors
-                    cursor.execute("""
-                        DELETE FROM STUDENTS
-                        WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)
-                    """, (senior_year,))
+                    if senior_class:
+                        Student.query.filter_by(class_year_id=senior_class.class_year_id).delete()
 
                     # Step 2: Delete all events and event results (resets all points)
-                    cursor.execute("DELETE FROM EVENT_RESULTS")
-                    cursor.execute("DELETE FROM EVENTS")
+                    EventResult.query.delete()
+                    Event.query.delete()
 
                     # Step 3: Promote all remaining students (decrease grad_year by 1)
-                    cursor.execute("UPDATE CLASS_YEARS SET grad_year = grad_year - 1")
+                    for cy in ClassYear.query.all():
+                        cy.grad_year = cy.grad_year - 1
 
                     # Step 4: Update class names to reflect new year
-                    cursor.execute("""
-                        UPDATE CLASS_YEARS
-                        SET class_name = CASE
-                            WHEN display_order = 1 THEN 'Senior'
-                            WHEN display_order = 2 THEN 'Junior'
-                            WHEN display_order = 3 THEN 'Sophomore'
-                            WHEN display_order = 4 THEN 'Freshman'
-                        END
-                    """)
+                    class_name_map = {1: 'Senior', 2: 'Junior', 3: 'Sophomore', 4: 'Freshman'}
+                    for cy in ClassYear.query.all():
+                        if cy.display_order in class_name_map:
+                            cy.class_name = class_name_map[cy.display_order]
 
-                    conn.commit()
+                    db.session.commit()
 
                     flash(f'Year-end reset completed! Removed {seniors_count} seniors, deleted {events_count} events, and promoted all remaining students. Backup saved automatically.', 'success')
                     return redirect(url_for('index'))
 
                 except Exception as e:
-                    conn.rollback()
+                    db.session.rollback()
                     flash(f'Error during year-end reset: {str(e)}', 'error')
-                finally:
-                    conn.close()
             else:
                 flash('Reset cancelled. You must type "RESET" to confirm.', 'error')
 
-    # GET request - show confirmation page with statistics
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    # Get statistics
-    cursor.execute("SELECT MIN(grad_year) FROM CLASS_YEARS")
-    senior_year = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM STUDENTS WHERE class_year_id = (SELECT class_year_id FROM CLASS_YEARS WHERE grad_year = ?)", (senior_year,))
-    seniors_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM STUDENTS")
-    total_students = cursor.fetchone()[0]
-
-    cursor.execute("SELECT COUNT(*) FROM EVENTS")
-    events_count = cursor.fetchone()[0]
-
-    cursor.execute("SELECT SUM(points_earned) FROM EVENT_RESULTS")
-    total_points = cursor.fetchone()[0] or 0
-
-    conn.close()
+    # GET request - show confirmation page with statistics using ORM
+    senior_class = ClassYear.query.order_by(ClassYear.grad_year.asc()).first()
+    senior_year = senior_class.grad_year if senior_class else None
+    seniors_count = Student.query.filter_by(class_year_id=senior_class.class_year_id).count() if senior_class else 0
+    total_students = Student.query.count()
+    events_count = Event.query.count()
+    total_points = db.session.query(db.func.sum(EventResult.points_earned)).scalar() or 0
 
     stats = {
         'senior_year': senior_year,
@@ -663,14 +835,14 @@ def year_end_reset():
 @login_required
 def index():
     """Home page - shows winning house and leaderboard"""
-    # Get winning house
-    winner = analyzer.get_winning_house()
+    # Get winning house using ORM helper
+    winner = get_winning_house()
 
-    # Get complete leaderboard
-    leaderboard = analyzer.get_complete_leaderboard()
+    # Get complete leaderboard using ORM helper
+    leaderboard = get_complete_leaderboard()
 
-    # Get house standings with points ahead
-    standings = analyzer.get_standings_with_points_ahead()
+    # Get house standings with points ahead using ORM helper
+    standings = get_standings_with_points_ahead()
 
     return render_template('index.html',
                          winner=winner,
@@ -681,52 +853,37 @@ def index():
 @app.route('/students')
 @login_required
 def students():
-    """View all students with search functionality"""
+    """View all students with search functionality using ORM"""
     search_query = request.args.get('search', '').strip()
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    # Build query using ORM
+    query = db.session.query(
+        Student.student_id,
+        (Student.fname + ' ' + Student.lname).label('student_name'),
+        Student.email,
+        House.house_name,
+        House.color,
+        ClassYear.class_name
+    ).join(House, Student.house_id == House.house_id
+    ).join(ClassYear, Student.class_year_id == ClassYear.class_year_id)
 
     if search_query:
         # Search by name or email
-        query = """
-        SELECT
-            s.student_id,
-            s.fname || ' ' || s.lname AS student_name,
-            s.email,
-            h.house_name,
-            h.color,
-            cy.class_name
-        FROM STUDENTS s
-        JOIN HOUSES h ON s.house_id = h.house_id
-        JOIN CLASS_YEARS cy ON s.class_year_id = cy.class_year_id
-        WHERE s.fname || ' ' || s.lname LIKE ?
-           OR s.email LIKE ?
-           OR s.fname LIKE ?
-           OR s.lname LIKE ?
-        ORDER BY h.house_name, cy.display_order, s.lname, s.fname
-        """
         search_pattern = f"%{search_query}%"
-        cursor.execute(query, (search_pattern, search_pattern, search_pattern, search_pattern))
-    else:
-        # Get all students
-        query = """
-        SELECT
-            s.student_id,
-            s.fname || ' ' || s.lname AS student_name,
-            s.email,
-            h.house_name,
-            h.color,
-            cy.class_name
-        FROM STUDENTS s
-        JOIN HOUSES h ON s.house_id = h.house_id
-        JOIN CLASS_YEARS cy ON s.class_year_id = cy.class_year_id
-        ORDER BY h.house_name, cy.display_order, s.lname, s.fname
-        """
-        cursor.execute(query)
+        query = query.filter(
+            db.or_(
+                (Student.fname + ' ' + Student.lname).ilike(search_pattern),
+                Student.email.ilike(search_pattern),
+                Student.fname.ilike(search_pattern),
+                Student.lname.ilike(search_pattern)
+            )
+        )
 
-    all_students = cursor.fetchall()
-    conn.close()
+    # Order results
+    query = query.order_by(House.house_name, ClassYear.display_order, Student.lname, Student.fname)
+
+    all_students = [(s.student_id, s.student_name, s.email, s.house_name, s.color, s.class_name)
+                    for s in query.all()]
 
     return render_template('students.html', students=all_students, search_query=search_query)
 
@@ -1075,27 +1232,20 @@ def bulk_import():
 @app.route('/events')
 @login_required
 def events():
-    """View all events"""
-    # Get all events with their results
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    """View all events using ORM"""
+    # Get all events with their results count
+    all_events_query = db.session.query(
+        Event.event_id,
+        Event.event_date,
+        Event.event_desc,
+        Event.event_type,
+        db.func.count(EventResult.house_id).label('houses_participated')
+    ).outerjoin(EventResult, Event.event_id == EventResult.event_id
+    ).group_by(Event.event_id
+    ).order_by(Event.event_date.desc()).all()
 
-    query = """
-    SELECT
-        e.event_id,
-        e.event_date,
-        e.event_desc,
-        e.event_type,
-        COUNT(er.house_id) as houses_participated
-    FROM EVENTS e
-    LEFT JOIN EVENT_RESULTS er ON e.event_id = er.event_id
-    GROUP BY e.event_id
-    ORDER BY e.event_date DESC
-    """
-
-    cursor.execute(query)
-    all_events = cursor.fetchall()
-    conn.close()
+    all_events = [(e.event_id, e.event_date, e.event_desc, e.event_type, e.houses_participated)
+                  for e in all_events_query]
 
     return render_template('events.html', events=all_events)
 
@@ -1103,33 +1253,26 @@ def events():
 @app.route('/event/<int:event_id>')
 @login_required
 def event_details(event_id):
-    """View details of a specific event"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
+    """View details of a specific event using ORM"""
     # Get event info
-    cursor.execute("""
-        SELECT event_id, event_date, event_desc, event_type
-        FROM EVENTS
-        WHERE event_id = ?
-    """, (event_id,))
-    event = cursor.fetchone()
+    event_obj = Event.query.get(event_id)
+    if not event_obj:
+        flash('Event not found', 'error')
+        return redirect(url_for('events'))
+
+    event = (event_obj.event_id, event_obj.event_date, event_obj.event_desc, event_obj.event_type)
 
     # Get results for this event
-    cursor.execute("""
-        SELECT
-            h.house_name,
-            h.color,
-            er.rank,
-            er.points_earned
-        FROM EVENT_RESULTS er
-        JOIN HOUSES h ON er.house_id = h.house_id
-        WHERE er.event_id = ?
-        ORDER BY er.rank
-    """, (event_id,))
-    results = cursor.fetchall()
+    results_query = db.session.query(
+        House.house_name,
+        House.color,
+        EventResult.rank,
+        EventResult.points_earned
+    ).join(House, EventResult.house_id == House.house_id
+    ).filter(EventResult.event_id == event_id
+    ).order_by(EventResult.rank).all()
 
-    conn.close()
+    results = [(r.house_name, r.color, r.rank, r.points_earned) for r in results_query]
 
     return render_template('event_details.html', event=event, results=results)
 
@@ -1138,27 +1281,25 @@ def event_details(event_id):
 @login_required
 @admin_required
 def delete_event(event_id):
-    """Delete an event and all its results"""
+    """Delete an event and all its results using ORM"""
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        # Get event for the flash message
+        event = Event.query.get(event_id)
+        event_name = event.event_desc if event else "Event"
 
-        # Get event name for the flash message
-        cursor.execute("SELECT event_desc FROM EVENTS WHERE event_id = ?", (event_id,))
-        event = cursor.fetchone()
-        event_name = event[0] if event else "Event"
+        if event:
+            # Delete event results first (cascade should handle this but being explicit)
+            EventResult.query.filter_by(event_id=event_id).delete()
 
-        # Delete event results first (due to foreign key constraint)
-        cursor.execute("DELETE FROM EVENT_RESULTS WHERE event_id = ?", (event_id,))
+            # Delete the event
+            db.session.delete(event)
+            db.session.commit()
 
-        # Delete the event
-        cursor.execute("DELETE FROM EVENTS WHERE event_id = ?", (event_id,))
-
-        conn.commit()
-        conn.close()
-
-        flash(f'Successfully deleted event: {event_name}', 'success')
+            flash(f'Successfully deleted event: {event_name}', 'success')
+        else:
+            flash('Event not found', 'error')
     except Exception as e:
+        db.session.rollback()
         flash(f'Error deleting event: {str(e)}', 'error')
 
     return redirect(url_for('events'))
@@ -1218,14 +1359,11 @@ def add_event():
 @login_required
 @rep_or_admin_required
 def quick_points():
-    """Quick points input without creating an event"""
+    """Quick points input without creating an event using ORM"""
     if request.method == 'POST':
         # Get houses
         houses = get_all_houses()
         points_awarded = []
-
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
 
         try:
             for house_id, house_name, color in houses:
@@ -1251,25 +1389,29 @@ def quick_points():
                             event_name = reason if reason else 'Quick Points'
                             stored_points = points_value
 
-                        # Insert event
-                        cursor.execute("""
-                            INSERT INTO EVENTS (event_date, event_desc, event_type)
-                            VALUES (?, ?, ?)
-                        """, (event_date, event_name, event_type))
+                        # Create new Event using ORM
+                        new_event = Event(
+                            event_date=event_date,
+                            event_desc=event_name,
+                            event_type=event_type
+                        )
+                        db.session.add(new_event)
+                        db.session.flush()  # Get the event_id
 
-                        event_id = cursor.lastrowid
-
-                        # Insert event result with absolute value (to satisfy constraint)
-                        cursor.execute("""
-                            INSERT INTO EVENT_RESULTS (event_id, house_id, points_earned, rank)
-                            VALUES (?, ?, ?, 1)
-                        """, (event_id, house_id, stored_points))
+                        # Create EventResult using ORM
+                        new_result = EventResult(
+                            event_id=new_event.event_id,
+                            house_id=house_id,
+                            points_earned=stored_points,
+                            rank=1
+                        )
+                        db.session.add(new_result)
 
                         # Format the message with + or - prefix
                         sign = '+' if points_value > 0 else ''
                         points_awarded.append(f"{house_name}: {sign}{points_value} points")
 
-            conn.commit()
+            db.session.commit()
 
             if points_awarded:
                 flash(f"Successfully applied points! {', '.join(points_awarded)}", 'success')
@@ -1277,10 +1419,8 @@ def quick_points():
                 flash('No points were applied. Please enter points for at least one house.', 'error')
 
         except Exception as e:
-            conn.rollback()
+            db.session.rollback()
             flash(f'Error awarding points: {str(e)}', 'error')
-        finally:
-            conn.close()
 
         return redirect(url_for('index'))
 
@@ -1293,7 +1433,7 @@ def quick_points():
 @login_required
 @admin_required
 def edit_student(student_id):
-    """Edit an existing student"""
+    """Edit an existing student using ORM"""
     if request.method == 'POST':
         # Get updated data
         fname = request.form.get('fname')
@@ -1307,40 +1447,34 @@ def edit_student(student_id):
             flash('All fields are required!', 'error')
         else:
             try:
-                # Update student in database
-                conn = sqlite3.connect(DB_PATH)
-                cursor = conn.cursor()
+                # Update student in database using ORM
+                student = Student.query.get(student_id)
+                if student:
+                    student.fname = fname
+                    student.lname = lname
+                    student.email = email
+                    student.house_id = int(house_id)
+                    student.class_year_id = int(class_year_id)
+                    db.session.commit()
 
-                cursor.execute("""
-                    UPDATE STUDENTS
-                    SET fname = ?, lname = ?, email = ?, house_id = ?, class_year_id = ?
-                    WHERE student_id = ?
-                """, (fname, lname, email, int(house_id), int(class_year_id), student_id))
-
-                conn.commit()
-                conn.close()
-
-                flash(f'Successfully updated {fname} {lname}!', 'success')
-                return redirect(url_for('students'))
+                    flash(f'Successfully updated {fname} {lname}!', 'success')
+                    return redirect(url_for('students'))
+                else:
+                    flash('Student not found!', 'error')
             except Exception as e:
+                db.session.rollback()
                 flash(f'Error updating student: {str(e)}', 'error')
 
-    # GET request - show form with current data
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    # GET request - show form with current data using ORM
+    student_obj = Student.query.get(student_id)
 
-    cursor.execute("""
-        SELECT student_id, fname, lname, email, house_id, class_year_id
-        FROM STUDENTS
-        WHERE student_id = ?
-    """, (student_id,))
-
-    student = cursor.fetchone()
-    conn.close()
-
-    if not student:
+    if not student_obj:
         flash('Student not found!', 'error')
         return redirect(url_for('students'))
+
+    # Convert to tuple format for template compatibility
+    student = (student_obj.student_id, student_obj.fname, student_obj.lname,
+               student_obj.email, student_obj.house_id, student_obj.class_year_id)
 
     # Get houses and class years for the form
     houses = get_all_houses()
@@ -1353,15 +1487,15 @@ def edit_student(student_id):
 @login_required
 @admin_required
 def leaderboard():
-    """Full leaderboard page"""
-    # Get complete leaderboard
-    leaderboard = analyzer.get_complete_leaderboard()
+    """Full leaderboard page using ORM"""
+    # Get complete leaderboard using ORM helper
+    leaderboard_data = get_complete_leaderboard()
 
-    # Get students by house standing
-    students_by_standing = analyzer.get_students_by_house_standing()
+    # Get students by house standing using ORM helper
+    students_by_standing = get_students_by_house_standing()
 
     return render_template('leaderboard.html',
-                         leaderboard=leaderboard,
+                         leaderboard=leaderboard_data,
                          students_by_standing=students_by_standing)
 
 
@@ -1369,15 +1503,15 @@ def leaderboard():
 @login_required
 @admin_required
 def winning_house():
-    """Detailed winning house page"""
-    # Get winning house
-    winner = analyzer.get_winning_house()
+    """Detailed winning house page using ORM"""
+    # Get winning house using ORM helper
+    winner = get_winning_house()
 
-    # Get students in winning house
-    winning_students = analyzer.get_students_in_winning_house()
+    # Get students in winning house using ORM helper
+    winning_students = get_students_in_winning_house()
 
-    # Get winning house students grouped by grade
-    students_by_grade = analyzer.get_winning_house_students_by_grade()
+    # Get winning house students grouped by grade using ORM helper
+    students_by_grade = get_winning_house_students_by_grade()
 
     return render_template('winning_house.html',
                          winner=winner,
