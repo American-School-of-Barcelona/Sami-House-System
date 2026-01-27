@@ -11,7 +11,6 @@
     <div style="display: flex; gap: 10px; margin-bottom: 30px; border-bottom: 2px solid #555;">
         <a href="{{ url_for('add_student', tab='manual') }}" style="padding: 15px 30px; background: {% if current_tab == 'manual' %}#e8e8d0{% else %}#555{% endif %}; color: {% if current_tab == 'manual' %}#2b2b2b{% else %}#fff{% endif %}; border: none; border-radius: 10px 10px 0 0; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block;">Manual Entry</a>
         <a href="{{ url_for('add_student', tab='csv') }}" style="padding: 15px 30px; background: {% if current_tab == 'csv' %}#e8e8d0{% else %}#555{% endif %}; color: {% if current_tab == 'csv' %}#2b2b2b{% else %}#fff{% endif %}; border: none; border-radius: 10px 10px 0 0; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block;">CSV Upload</a>
-        <a href="{{ url_for('add_student', tab='homeroom') }}" style="padding: 15px 30px; background: {% if current_tab == 'homeroom' %}#e8e8d0{% else %}#555{% endif %}; color: {% if current_tab == 'homeroom' %}#2b2b2b{% else %}#fff{% endif %}; border: none; border-radius: 10px 10px 0 0; cursor: pointer; font-weight: bold; text-decoration: none; display: inline-block;">Homeroom Bulk Add</a>
     </div>
 
     <!-- Manual Entry Tab -->
@@ -185,5 +184,4 @@ John,Smith,john.smith@asbarcelona.com,Athena,Freshman</pre>
         </div>
     </div>
     {% endif %}
-
-  
+{% endblock %}
