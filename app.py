@@ -1260,6 +1260,11 @@ def event_details(event_id):
         flash('Event not found', 'error')
         return redirect(url_for('events'))
 
+    # Hide quick_points and deduction events from guests
+    if current_user.role == 'guest' and event_obj.event_type in ['quick_points', 'deduction']:
+        flash('You do not have permission to view this event', 'error')
+        return redirect(url_for('events'))
+
     event = (event_obj.event_id, event_obj.event_date, event_obj.event_desc, event_obj.event_type)
 
     # Get results for this event

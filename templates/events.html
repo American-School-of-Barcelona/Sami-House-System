@@ -5,9 +5,11 @@
 {% block content %}
     <h2>All Events</h2>
 
+    {% if current_user.role in ['admin', 'rep'] %}
     <div style="margin-bottom: 20px;">
         <a href="{{ url_for('add_event') }}" class="btn">➕ Add New Event</a>
     </div>
+    {% endif %}
 
     <table>
         <thead>
@@ -21,7 +23,10 @@
             </tr>
         </thead>
         <tbody>
+            {% set visible_count = namespace(value=0) %}
             {% for event_id, event_date, event_desc, event_type, houses_participated in events %}
+            {% if current_user.role != 'guest' or (event_type != 'quick_points' and event_type != 'deduction') %}
+            {% set visible_count.value = visible_count.value + 1 %}
             <tr>
                 <td>{{ event_id }}</td>
                 <td>{{ event_date }}</td>
@@ -32,11 +37,12 @@
                     <a href="{{ url_for('event_details', event_id=event_id) }}" class="btn" style="padding: 5px 10px; font-size: 14px;">View Details</a>
                 </td>
             </tr>
+            {% endif %}
             {% endfor %}
         </tbody>
     </table>
 
     <p style="margin-top: 20px; color: #666;">
-        Total Events: {{ events|length }}
+        Total Events: {% if current_user.role == 'guest' %}{{ visible_count.value }}{% else %}{{ events|length }}{% endif %}
     </p>
 {% endblock %}
