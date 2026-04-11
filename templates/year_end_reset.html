@@ -10,20 +10,39 @@
     <div style="background: #d4edda; padding: 20px; margin-bottom: 30px; border-radius: 10px; border-left: 5px solid #28a745; color: #155724;">
         <h3 style="color: #155724; margin-bottom: 15px;">💾 Backup & Restore</h3>
         <p style="margin-bottom: 15px;"><strong>Test safely:</strong> Create a backup before testing the reset, then restore if needed.</p>
-        <div style="display: flex; gap: 15px;">
-            <form method="POST" action="{{ url_for('year_end_reset') }}" style="flex: 1;">
-                <input type="hidden" name="action" value="backup">
-                <button type="submit" style="width: 100%; background: #28a745; color: #fff; padding: 12px; font-size: 1em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">
-                    💾 Create Backup Now
+
+        <form method="POST" action="{{ url_for('year_end_reset') }}" style="margin-bottom: 15px;">
+            <input type="hidden" name="action" value="backup">
+            <button type="submit" style="width: 100%; background: #28a745; color: #fff; padding: 12px; font-size: 1em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">
+                💾 Create Backup Now
+            </button>
+        </form>
+
+        {% if backups %}
+        <form method="POST" action="{{ url_for('year_end_reset') }}"
+              onsubmit="return confirm('Restore from \'' + this.backup_file.options[this.backup_file.selectedIndex].text + '\'? All current data will be replaced.');">
+            <input type="hidden" name="action" value="restore">
+            <label for="backup_file" style="display: block; font-weight: bold; margin-bottom: 6px;">Restore from backup:</label>
+            <div style="display: flex; gap: 10px;">
+                <select name="backup_file" id="backup_file" required
+                        style="flex: 1; padding: 10px; border-radius: 8px; background: #fff; border: 1px solid #28a745; color: #155724; font-size: 0.95em;">
+                    {% for b in backups %}
+                    {% if 'before_reset' in b %}
+                        <option value="{{ b }}">[Auto] {{ b }}</option>
+                    {% else %}
+                        <option value="{{ b }}">[Manual] {{ b }}</option>
+                    {% endif %}
+                {% endfor %}
+                </select>
+                <button type="submit" style="background: #17a2b8; color: #fff; padding: 10px 18px; font-size: 1em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; white-space: nowrap;">
+                    ↩️ Restore
                 </button>
-            </form>
-            <form method="POST" action="{{ url_for('year_end_reset') }}" style="flex: 1;" onsubmit="return confirm('Are you sure you want to restore from the latest backup? This will undo any changes made after the backup.');">
-                <input type="hidden" name="action" value="restore">
-                <button type="submit" style="width: 100%; background: #17a2b8; color: #fff; padding: 12px; font-size: 1em; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">
-                    ↩️ Restore Latest Backup
-                </button>
-            </form>
-        </div>
+            </div>
+        </form>
+        {% else %}
+        <p style="color: #555; font-style: italic; margin-top: 5px;">No backups available yet.</p>
+        {% endif %}
+
         <p style="margin-top: 10px; font-size: 0.9em; color: #155724;">
             💡 <strong>Tip:</strong> The reset will automatically create a backup, but you can create one manually here to test safely.
         </p>

@@ -50,6 +50,13 @@
         <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
             <button type="submit">Save Changes</button>
             <a href="{{ url_for('students') }}" class="btn btn-secondary">Cancel</a>
+            <button type="button" class="btn btn-danger"
+                    onclick="if(confirm('Are you sure you want to delete {{ student[1] }} {{ student[2] }}? This cannot be undone.')) { document.getElementById('delete-form').submit(); }"
+                    style="background-color: #c0392b; margin-left: auto;">
+                Delete Student
+            </button>
         </div>
     </form>
+
+    <form id="delete-form" method="POST" action="{{ url_for('delete_student', student_id=student[0]) }}"></form>
 {% endblock %}

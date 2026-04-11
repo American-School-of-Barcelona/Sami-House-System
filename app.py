@@ -720,36 +720,41 @@ def year_end_reset():
         if action == 'backup':
             # Create backup
             try:
-                backup_dir = os.path.join('playground', 'backups')
+                backup_dir = os.path.join(BASE_DIR, 'playground', 'backups')
                 os.makedirs(backup_dir, exist_ok=True)
 
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 backup_file = os.path.join(backup_dir, f'testhouse_backup_{timestamp}.db')
 
-                shutil.copy2(DB_PATH, backup_file)
+                import sqlite3 as _sqlite3
+                src = _sqlite3.connect(DB_PATH)
+                dst = _sqlite3.connect(backup_file)
+                src.backup(dst)
+                dst.close()
+                src.close()
                 flash(f'Backup created successfully: {os.path.basename(backup_file)}', 'success')
             except Exception as e:
                 flash(f'Error creating backup: {str(e)}', 'error')
             return redirect(url_for('year_end_reset'))
 
         elif action == 'restore':
-            # Restore from latest backup
+            backup_file = request.form.get('backup_file')
             try:
-                backup_dir = os.path.join('playground', 'backups')
-                if not os.path.exists(backup_dir):
-                    flash('No backups found', 'error')
+                backup_dir = os.path.join(BASE_DIR, 'playground', 'backups')
+                if not backup_file:
+                    flash('No backup selected.', 'error')
                     return redirect(url_for('year_end_reset'))
 
-                backups = [f for f in os.listdir(backup_dir) if f.startswith('testhouse_backup_') and f.endswith('.db')]
-                if not backups:
-                    flash('No backups found', 'error')
-                    return redirect(url_for('year_end_reset'))
+                # Prevent path traversal — only allow plain filenames
+                backup_file = os.path.basename(backup_file)
+                backup_path = os.path.join(backup_dir, backup_file)
 
-                latest_backup = max(backups)
-                backup_path = os.path.join(backup_dir, latest_backup)
+                if not os.path.exists(backup_path):
+                    flash('Backup file not found.', 'error')
+                    return redirect(url_for('year_end_reset'))
 
                 shutil.copy2(backup_path, DB_PATH)
-                flash(f'Database restored from backup: {latest_backup}', 'success')
+                flash(f'Database restored from: {backup_file}', 'success')
                 return redirect(url_for('index'))
             except Exception as e:
                 flash(f'Error restoring backup: {str(e)}', 'error')
@@ -766,7 +771,12 @@ def year_end_reset():
 
                     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                     backup_file = os.path.join(backup_dir, f'testhouse_before_reset_{timestamp}.db')
-                    shutil.copy2(DB_PATH, backup_file)
+                    import sqlite3 as _sqlite3
+                    src = _sqlite3.connect(DB_PATH)
+                    dst = _sqlite3.connect(backup_file)
+                    src.backup(dst)
+                    dst.close()
+                    src.close()
                 except Exception as e:
                     flash(f'Warning: Could not create automatic backup: {str(e)}', 'error')
 
@@ -787,15 +797,26 @@ def year_end_reset():
                     EventResult.query.delete()
                     Event.query.delete()
 
-                    # Step 3: Promote all remaining students (decrease grad_year by 1)
-                    for cy in ClassYear.query.all():
-                        cy.grad_year = cy.grad_year - 1
+                    # Step 3: Promote all remaining students by moving them to the next class year up
+                    # Build a map from display_order -> ClassYear record
+                    all_class_years = ClassYear.query.order_by(ClassYear.display_order).all()
+                    order_to_cy = {cy.display_order: cy for cy in all_class_years}
 
-                    # Step 4: Update class names to reflect new year
-                    class_name_map = {1: 'Senior', 2: 'Junior', 3: 'Sophomore', 4: 'Freshman'}
-                    for cy in ClassYear.query.all():
-                        if cy.display_order in class_name_map:
-                            cy.class_name = class_name_map[cy.display_order]
+                    # Move students up one level (display_order decreases toward Senior=1)
+                    # Process from most-senior non-senior downward to avoid conflicts
+                    for cy in sorted(all_class_years, key=lambda c: c.display_order):
+                        if cy.display_order == 1:
+                            # These are the seniors — already deleted above, skip
+                            continue
+                        target_cy = order_to_cy.get(cy.display_order - 1)
+                        if target_cy:
+                            Student.query.filter_by(class_year_id=cy.class_year_id).update(
+                                {'class_year_id': target_cy.class_year_id}
+                            )
+
+                    # Step 4: Update grad_year on each ClassYear to reflect the new cohort
+                    for cy in all_class_years:
+                        cy.grad_year = cy.grad_year - 1
 
                     db.session.commit()
 
@@ -824,7 +845,14 @@ def year_end_reset():
         'total_points': total_points
     }
 
-    return render_template('year_end_reset.html', stats=stats)
+    # Build list of available backups sorted by modification time, newest first
+    backup_dir = os.path.join(BASE_DIR, 'playground', 'backups')
+    backups = []
+    if os.path.exists(backup_dir):
+        files = [f for f in os.listdir(backup_dir) if f.endswith('.db')]
+        backups = sorted(files, key=lambda f: os.path.getmtime(os.path.join(backup_dir, f)), reverse=True)
+
+    return render_template('year_end_reset.html', stats=stats, backups=backups)
 
 
 # ============================================
@@ -913,8 +941,15 @@ def add_student():
 
             try:
                 # Read CSV file with UTF-8 encoding
-                stream = io.StringIO(file.stream.read().decode("utf-8-sig"), newline=None)
-                csv_reader = csv.DictReader(stream)
+                raw = file.stream.read().decode("utf-8-sig")
+                first_line = raw.splitlines()[0] if raw.strip() else ''
+
+                # Detect format: headerless if first field looks like a name (no underscore)
+                # Header format:  first_name,last_name,email,house,class_year
+                # Headerless format: Full Name,email,,House,ClassYear
+                has_header = 'first_name' in first_line.lower() or 'last_name' in first_line.lower()
+
+                stream = io.StringIO(raw, newline=None)
 
                 # Get houses and class years for mapping
                 houses_dict = {h[1].lower(): h[0] for h in get_all_houses()}
@@ -922,40 +957,84 @@ def add_student():
 
                 added_students = []
                 errors = []
-                line_num = 1
 
-                for row in csv_reader:
-                    line_num += 1
-                    try:
-                        fname = row.get('first_name', '').strip()
-                        lname = row.get('last_name', '').strip()
-                        email = row.get('email', '').strip()
-                        house_name = row.get('house', '').strip().lower()
-                        class_year_name = row.get('class_year', '').strip().lower()
+                if has_header:
+                    csv_reader = csv.DictReader(stream)
+                    rows = list(csv_reader)
+                    for line_num, row in enumerate(rows, start=2):
+                        try:
+                            fname = row.get('first_name', '').strip()
+                            lname = row.get('last_name', '').strip()
+                            email = row.get('email', '').strip()
+                            house_name = row.get('house', '').strip().lower()
+                            class_year_name = row.get('class_year', '').strip().lower()
 
-                        if not all([fname, lname, email, house_name, class_year_name]):
-                            errors.append(f'Line {line_num}: Missing required fields')
+                            if not all([fname, lname, email, house_name, class_year_name]):
+                                errors.append(f'Line {line_num}: Missing required fields')
+                                continue
+                            if house_name not in houses_dict:
+                                errors.append(f'Line {line_num}: Invalid house "{house_name}"')
+                                continue
+                            if class_year_name not in class_years_dict:
+                                errors.append(f'Line {line_num}: Invalid class year "{class_year_name}"')
+                                continue
+
+                            house_id = houses_dict[house_name]
+                            class_year_id = class_years_dict[class_year_name]
+                            new_student = Student(fname=fname, lname=lname, email=email, house_id=house_id, class_year_id=class_year_id)
+                            db.session.add(new_student)
+                            db.session.flush()
+                            added_students.append(f'{fname} {lname}')
+                        except Exception as e:
+                            errors.append(f'Line {line_num}: {str(e)}')
+                else:
+                    # Headerless format: Full Name, email, (ignored), House, ClassYear
+                    csv_reader = csv.reader(stream)
+                    for line_num, row in enumerate(csv_reader, start=1):
+                        if not any(row):
                             continue
+                        try:
+                            if len(row) < 5:
+                                errors.append(f'Line {line_num}: Expected 5 columns, got {len(row)}')
+                                continue
 
-                        if house_name not in houses_dict:
-                            errors.append(f'Line {line_num}: Invalid house "{house_name}"')
-                            continue
+                            full_name = row[0].strip()
+                            email = row[1].strip()
+                            house_name = row[3].strip().lower()
+                            class_year_name = row[4].strip().lower()
 
-                        if class_year_name not in class_years_dict:
-                            errors.append(f'Line {line_num}: Invalid class year "{class_year_name}"')
-                            continue
+                            # Split full name into first / last
+                            name_parts = full_name.split()
+                            if len(name_parts) < 2:
+                                errors.append(f'Line {line_num}: Could not parse name "{full_name}"')
+                                continue
+                            fname = name_parts[0]
+                            lname = ' '.join(name_parts[1:])
 
-                        house_id = houses_dict[house_name]
-                        class_year_id = class_years_dict[class_year_name]
+                            if not all([fname, lname, email, house_name, class_year_name]):
+                                errors.append(f'Line {line_num}: Missing required fields')
+                                continue
+                            if house_name not in houses_dict:
+                                errors.append(f'Line {line_num}: Invalid house "{house_name}"')
+                                continue
+                            if class_year_name not in class_years_dict:
+                                errors.append(f'Line {line_num}: Invalid class year "{class_year_name}"')
+                                continue
 
-                        db.add_student(fname, lname, email, house_id, class_year_id)
-                        added_students.append(f'{fname} {lname}')
-
-                    except Exception as e:
-                        errors.append(f'Line {line_num}: {str(e)}')
+                            house_id = houses_dict[house_name]
+                            class_year_id = class_years_dict[class_year_name]
+                            new_student = Student(fname=fname, lname=lname, email=email, house_id=house_id, class_year_id=class_year_id)
+                            db.session.add(new_student)
+                            db.session.flush()
+                            added_students.append(f'{fname} {lname}')
+                        except Exception as e:
+                            errors.append(f'Line {line_num}: {str(e)}')
 
                 if added_students:
+                    db.session.commit()
                     flash(f'Successfully imported {len(added_students)} students!', 'success')
+                else:
+                    db.session.rollback()
 
                 if errors:
                     flash(f'{len(errors)} errors occurred. First few: {"; ".join(errors[:5])}', 'error')
@@ -964,6 +1043,7 @@ def add_student():
                     return redirect(url_for('students'))
 
             except Exception as e:
+                db.session.rollback()
                 flash(f'Error processing CSV file: {str(e)}', 'error')
                 return redirect(url_for('add_student'))
 
@@ -1004,13 +1084,18 @@ def add_student():
                 email = f'{fname.lower()}.{lname.lower().replace(" ", "")}@asbarcelona.com'
 
                 try:
-                    db.add_student(fname, lname, email, int(house_id), int(class_year_id))
+                    new_student = Student(fname=fname, lname=lname, email=email, house_id=int(house_id), class_year_id=int(class_year_id))
+                    db.session.add(new_student)
+                    db.session.flush()
                     added_students.append(f'{fname} {lname}')
                 except Exception as e:
                     errors.append(f'Line {i} ({fname} {lname}): {str(e)}')
 
             if added_students:
+                db.session.commit()
                 flash(f'Successfully added {len(added_students)} students!', 'success')
+            else:
+                db.session.rollback()
 
             if errors:
                 for error in errors[:10]:
@@ -1037,9 +1122,12 @@ def add_student():
                     continue
 
                 try:
-                    student_id = db.add_student(fname, lname, email, int(house_id), int(class_year_id))
+                    new_student = Student(fname=fname, lname=lname, email=email, house_id=int(house_id), class_year_id=int(class_year_id))
+                    db.session.add(new_student)
+                    db.session.commit()
                     added_students.append(f'{fname} {lname}')
                 except Exception as e:
+                    db.session.rollback()
                     errors.append(f'Student {i + 1} ({fname} {lname}): {str(e)}')
 
             if added_students:
@@ -1148,7 +1236,9 @@ def bulk_import():
                         class_year_id = class_years[class_year_name]
 
                         # Add student
-                        db.add_student(fname, lname, email, house_id, class_year_id)
+                        new_student = Student(fname=fname, lname=lname, email=email, house_id=house_id, class_year_id=class_year_id)
+                        db.session.add(new_student)
+                        db.session.flush()
                         added_students.append(f'{fname} {lname}')
 
                     except Exception as e:
@@ -1156,7 +1246,10 @@ def bulk_import():
 
                 # Show results
                 if added_students:
+                    db.session.commit()
                     flash(f'Successfully imported {len(added_students)} students!', 'success')
+                else:
+                    db.session.rollback()
 
                 if errors:
                     flash(f'{len(errors)} errors occurred. First few: {"; ".join(errors[:5])}', 'error')
@@ -1165,6 +1258,7 @@ def bulk_import():
                     return redirect(url_for('students'))
 
             except Exception as e:
+                db.session.rollback()
                 flash(f'Error processing CSV file: {str(e)}', 'error')
                 return redirect(url_for('bulk_import'))
 
@@ -1207,14 +1301,19 @@ def bulk_import():
                 email = f'{fname.lower()}.{lname.lower().replace(" ", "")}@asbarcelona.com'
 
                 try:
-                    db.add_student(fname, lname, email, int(house_id), int(class_year_id))
+                    new_student = Student(fname=fname, lname=lname, email=email, house_id=int(house_id), class_year_id=int(class_year_id))
+                    db.session.add(new_student)
+                    db.session.flush()
                     added_students.append(f'{fname} {lname}')
                 except Exception as e:
                     errors.append(f'Line {i} ({fname} {lname}): {str(e)}')
 
             # Show results
             if added_students:
+                db.session.commit()
                 flash(f'Successfully added {len(added_students)} students!', 'success')
+            else:
+                db.session.rollback()
 
             if errors:
                 for error in errors[:10]:  # Show first 10 errors
@@ -1345,13 +1444,21 @@ def add_event():
             flash('Please enter results for at least one house!', 'error')
         else:
             try:
-                # Add event and results to database
-                event_id = db.add_complete_event_with_results(
-                    event_date, event_name, event_type, results
-                )
+                # Create the event
+                new_event = Event(event_date=event_date, event_desc=event_name, event_type=event_type)
+                db.session.add(new_event)
+                db.session.flush()  # get new_event.event_id before commit
+
+                # Add results for each house
+                for house_id, points, rank in results:
+                    result = EventResult(event_id=new_event.event_id, house_id=house_id, points_earned=points, rank=rank)
+                    db.session.add(result)
+
+                db.session.commit()
                 flash(f'Successfully added event: {event_name}!', 'success')
                 return redirect(url_for('events'))
             except Exception as e:
+                db.session.rollback()
                 flash(f'Error adding event: {str(e)}', 'error')
 
     # Get houses for the form
@@ -1486,6 +1593,28 @@ def edit_student(student_id):
     class_years = get_all_class_years()
 
     return render_template('edit_student.html', student=student, houses=houses, class_years=class_years)
+
+
+@app.route('/delete-student/<int:student_id>', methods=['POST'])
+@login_required
+@admin_required
+def delete_student(student_id):
+    """Delete a student"""
+    try:
+        student = Student.query.get(student_id)
+        if not student:
+            flash('Student not found!', 'error')
+            return redirect(url_for('students'))
+
+        name = f'{student.fname} {student.lname}'
+        db.session.delete(student)
+        db.session.commit()
+        flash(f'Successfully deleted {name}.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error deleting student: {str(e)}', 'error')
+
+    return redirect(url_for('students'))
 
 
 @app.route('/leaderboard')
